@@ -1,5 +1,6 @@
 import yfinance as yf
 from datetime import datetime, timedelta
+import json
 
 def _load_ticker_history(ticker: yf.Ticker, start_date, end_date):
     return ticker.history(start=start_date,
@@ -29,4 +30,21 @@ def load_and_store(tickers: list[str],
     for ticker, history, _ in histories:
         history.to_csv(f'{folder_path}/{ticker}.csv', date_format='%Y-%m-%d')
 
+        print(f'Ticker info {ticker} is loaded and stored.')
+
     return [(ticker, name) for ticker, _, name in histories]
+
+def main():
+    with open('./project_config.json', 'r') as config_file:
+        config = json.load(config_file)
+
+    tickers = config['tickers']
+    start_date = datetime.fromisoformat(config['start_date'])
+    end_date = datetime.fromisoformat(config['end_date'])
+    tickers_dir_path = config['data']['tickers_path']
+
+    load_and_store(tickers, start_date, end_date, tickers_dir_path)
+
+
+if __name__ == '__main__':
+    main()
