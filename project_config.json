@@ -9,6 +9,7 @@
     "start_date": "2003-02-25",
     "end_date": "2018-01-10",
     "data": {
-        "tickers_path": "./data/external/tickers"
+        "tickers_path": "./data/external/tickers",
+        "tickers_ta_path": "./data/interim/tickers_ta"
     }
 }
