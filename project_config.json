@@ -10,6 +10,15 @@
     "end_date": "2018-01-10",
     "data": {
         "tickers_path": "./data/external/tickers",
-        "tickers_ta_path": "./data/interim/tickers_ta"
+        "tickers_ta_path": "./data/processed/tickers_ta",
+        "train_path": "./data/processed/split/train",
+        "validation_path": "./data/processed/split/validation",
+        "test_path": "./data/processed/split/test"
+    },
+    "modelling": {
+        "split": {
+            "train_size": 0.6,
+            "validation_size": 0.2
+        }
     }
 }
