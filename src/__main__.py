@@ -19,22 +19,22 @@ def main():
     train_size = config['modelling']['split']['train_size']
     validation_size = config['modelling']['split']['validation_size']
 
-    loaded_tickers = tickers_loader.load_and_store(tickers,
-                                                   start_date,
-                                                   end_date,
-                                                   tickers_dir_path)
+    # loaded_tickers = tickers_loader.load_and_store(tickers,
+    #                                                start_date,
+    #                                                end_date,
+    #                                                tickers_dir_path)
     
-    ta_tickers = technical_analysis.perform_ta(tickers,
-                                               tickers_dir_path,
-                                               tickers_ta_path)
+    # ta_tickers = technical_analysis.perform_ta(tickers,
+    #                                            tickers_dir_path,
+    #                                            tickers_ta_path)
     
-    for ticker in tickers:
-        train_test_split.split(ticker,
-                               tickers_ta_path,
-                               tickers_train_path,
-                               tickers_val_path,
-                               tickers_test_path,
-                               train_size,
-                               validation_size)
+    # for ticker in tickers:
+    #     train_test_split.split(ticker,
+    #                            tickers_ta_path,
+    #                            tickers_train_path,
+    #                            tickers_val_path,
+    #                            tickers_test_path,
+    #                            train_size,
+    #                            validation_size)
 
 main()
