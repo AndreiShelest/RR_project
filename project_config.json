@@ -13,7 +13,8 @@
         "tickers_ta_path": "./data/processed/tickers_ta",
         "train_path": "./data/processed/split/train",
         "validation_path": "./data/processed/split/validation",
-        "test_path": "./data/processed/split/test"
+        "test_path": "./data/processed/split/test",
+        "interim_train_path": "./data/interim/train"
     },
     "modelling": {
         "split": {
