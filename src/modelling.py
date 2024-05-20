@@ -1,6 +1,6 @@
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
+from sklearn.decomposition import PCA
 import pandas as pd
 import json
 import numpy as np
@@ -14,22 +14,28 @@ def main():
     interim_train_path = config['data']['interim_train_path']
     tickers = config['tickers']
 
+    pca_components = config['modelling']['pca']['components']
+
     pipelines = {}
 
     for ticker in tickers:
         train_df = pd.read_csv(f'{tickers_train_path}/{ticker}.csv', index_col='date')
 
         ind_imputer = imputation.IndicatorImputer()
+        pca = PCA(n_components=pca_components)
 
-        pipelines[ticker] = Pipeline(
-            [
+        pipeline_steps = [
                 ('imputer', ind_imputer),
                 ('normalizer', MinMaxScaler()),
+                ('pca', pca)
             ]
-        )
+        
+        pipelines[ticker] = Pipeline(pipeline_steps)
 
         transformed = pipelines[ticker].fit_transform(train_df)
-        transformed_df = pd.DataFrame(data=transformed, columns=train_df.columns)
+
+        transformed_df = pd.DataFrame(data=transformed,
+                                      columns=[f'C{idx}' for idx in range(pca_components)])
         transformed_df.insert(0, train_df.index.name, train_df.index)
         transformed_df.set_index(train_df.index.name, inplace=True)
 
