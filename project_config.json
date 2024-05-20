@@ -19,7 +19,11 @@
     "modelling": {
         "split": {
             "train_size": 0.6,
-            "validation_size": 0.2
+            "validation_size": 0.2,
+            "gap": 100
+        },
+        "pca": {
+            "components": 6
         }
     }
 }
