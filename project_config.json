@@ -14,7 +14,8 @@
         "train_path": "./data/processed/split/train",
         "validation_path": "./data/processed/split/validation",
         "test_path": "./data/processed/split/test",
-        "interim_train_path": "./data/interim/train"
+        "interim_train_path": "./data/interim/train",
+        "target_var_path": "./data/processed/target_var"
     },
     "modelling": {
         "split": {
