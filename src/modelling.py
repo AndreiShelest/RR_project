@@ -35,7 +35,7 @@ def main():
         transformed = pipelines[ticker].fit_transform(train_df)
 
         transformed_df = pd.DataFrame(data=transformed,
-                                      columns=[f'C{idx}' for idx in range(pca_components)])
+                                      columns=[f'C{idx}' for idx, _ in enumerate(transformed[0])])
         transformed_df.insert(0, train_df.index.name, train_df.index)
         transformed_df.set_index(train_df.index.name, inplace=True)
 
