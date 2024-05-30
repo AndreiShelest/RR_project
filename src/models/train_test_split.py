@@ -10,7 +10,7 @@ def split(ticker: str,
           train_size: float,
           validation_size: float,
           gap: float):
-    ticker_df = pd.read_csv(f'{tickers_ta_path}/{ticker}.csv', index_col='date')
+    ticker_df = pd.read_csv(f'{tickers_ta_path}/{ticker}.csv', index_col='Date')
     df_size = len(ticker_df)
 
     df_train_size = np.floor(train_size * df_size - gap).astype(int)

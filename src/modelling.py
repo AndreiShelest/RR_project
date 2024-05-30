@@ -19,7 +19,7 @@ def main():
     pipelines = {}
 
     for ticker in tickers:
-        train_df = pd.read_csv(f'{tickers_train_path}/{ticker}.csv', index_col='date')
+        train_df = pd.read_csv(f'{tickers_train_path}/{ticker}.csv', index_col='Date')
 
         ind_imputer = imputation.IndicatorImputer()
         pca = PCA(n_components=pca_components)

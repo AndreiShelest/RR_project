@@ -65,6 +65,15 @@ def perform_ta(tickers: list[str], input_dir_path: str, output_dir_path: str):
         _prepare_ticker_df(ticker_df)
         _perform_technical_analysis(ticker_df)
 
+        ticker_df.rename(columns={
+            'open': 'Open',
+            'high': 'High',
+            'low': 'Low',
+            'close': 'Close',
+            'volume': 'Volume'
+        }, inplace=True)
+        ticker_df.index.name = 'Date'
+
         ticker_df.to_csv(f'{output_dir_path}/{ticker}.csv')
 
         print(f'TA for {ticker} has been performed.')
