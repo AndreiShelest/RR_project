@@ -3,7 +3,7 @@ import json
 import pandas as pd
 
 class TradingStrategy(Strategy):
-    def init(self):
+    def init(self, indicator_func):
         return
     
     def next(self):
@@ -16,9 +16,12 @@ def main():
     tickers = config['tickers']
 
     for ticker in tickers:
-        test_df =  pd.read_csv(f'{tickers_test_path}/{ticker}.csv', index_col='date')
+        test_df =  pd.read_csv(f'{tickers_test_path}/{ticker}.csv', index_col='Date')
+        test_df.index = pd.to_datetime(test_df.index)
 
-        print(test_df.columns)
+        backtest = Backtest(data=test_df, strategy=TradingStrategy)
+        results = backtest.run()
+        # print(f'Ticker={ticker}, return={results["Buy & Hold Return [%]"]}')
     
     return
 
