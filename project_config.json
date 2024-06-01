@@ -38,5 +38,8 @@
             "eval_metric": "auc"
         }
     },
+    "strategy": {
+        "initial_cash": 100000
+    },
     "seed": 12345
 }

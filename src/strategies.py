@@ -8,6 +8,8 @@ class TradingStrategy(Strategy):
 
         if self.data[signal_label][0] == 1:
             self.buy()
+        elif self.data[signal_label][0] == 0:
+            self.sell()
 
     def next(self):
         curr_signal = self.data[signal_label][-1]
