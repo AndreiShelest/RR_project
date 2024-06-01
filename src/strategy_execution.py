@@ -71,7 +71,7 @@ def main():
         test_df['High'] = test_df['Close']
         test_df['Low'] = test_df['Close']
 
-        for system_type in True, system_types:
+        for system_type in system_types:
             signal_df = pd.read_csv(
                 f'{signal_path}/{system_type}/{ticker}.csv', index_col='Date'
             )

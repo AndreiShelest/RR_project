@@ -1,10 +1,11 @@
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.pipeline import Pipeline
 from sklearn.decomposition import PCA
 import pandas as pd
 import json
 from xgboost import XGBClassifier
 from sklearn.base import TransformerMixin, BaseEstimator
+from pathlib import Path
+from system_types import create_pipeline, system_types
 
 
 class Debug(BaseEstimator, TransformerMixin):
@@ -30,21 +31,42 @@ class Debug(BaseEstimator, TransformerMixin):
         return self
 
 
-def main():
-    with open('./project_config.json', 'r') as config_file:
-        config = json.load(config_file)
+def _generate_test_signal(
+    ticker,
+    system_type,
+    X_train: pd.DataFrame,
+    Y_train: pd.DataFrame,
+    X_test: pd.DataFrame,
+    Y_test: pd.DataFrame,
+    pca_settings,
+    xgboost_settings,
+):
+    model = create_pipeline(
+        system_type,
+        normalizer=MinMaxScaler(),
+        pca=PCA(**pca_settings),
+        xgboost=XGBClassifier(**xgboost_settings),
+    )
+    model.fit(X_train, Y_train)
 
-    tickers_train_path = config['data']['train_path']
-    tickers_test_path = config['data']['test_path']
-    interim_train_path = config['data']['interim_train_path']
-    signal_path = config['data']['signal_path']
-    target_feature_path = config['data']['target_var_path']
-    tickers = config['tickers']
+    test_score = model.score(X_test, Y_test)
+    print(f'System={system_type}, ticker={ticker}, test_score={test_score}')
 
-    pca_components = config['modelling']['pca']['components']
+    signal = model.predict(X_test)
 
-    pipelines = {}
+    signal_df = pd.DataFrame({'Signal': signal}, index=X_test.index)
+    return signal_df
 
+
+def perform_modelling(
+    tickers,
+    tickers_train_path,
+    tickers_test_path,
+    target_feature_path,
+    signal_path,
+    pca_settings,
+    xgboost_settings,
+):
     for ticker in tickers:
         train_df = pd.read_csv(f'{tickers_train_path}/{ticker}.csv', index_col='Date')
         train_df.dropna(inplace=True)
@@ -53,35 +75,48 @@ def main():
             f'{target_feature_path}/{ticker}.csv', index_col='Date'
         ).loc[train_df.index]
 
-        pca = PCA(n_components=pca_components)
-        bst = XGBClassifier(
-            booster='gbtree',
-            n_estimators=100,
-            objective='binary:logistic',
-            eval_metric='auc',
-        )
-
-        pipeline_steps = [
-            ('normalizer', MinMaxScaler()),
-            ('pca', pca),
-            ('debug', Debug(ticker, train_df.index, interim_train_path)),
-            ('xgboost', bst),
-        ]
-
-        pipelines[ticker] = Pipeline(pipeline_steps)
-        pipelines[ticker].fit(train_df, train_feat_df)
-
         test_df = pd.read_csv(f'{tickers_test_path}/{ticker}.csv', index_col='Date')
         test_feat_df = pd.read_csv(
             f'{target_feature_path}/{ticker}.csv', index_col='Date'
         ).loc[test_df.index]
 
-        test_score = pipelines[ticker].score(test_df, test_feat_df)
-        print(f'{ticker}; test_score={test_score}')
+        for system_type in system_types:
+            signal_df = _generate_test_signal(
+                ticker,
+                system_type,
+                train_df,
+                train_feat_df,
+                test_df,
+                test_feat_df,
+                pca_settings,
+                xgboost_settings,
+            )
 
-        signal = pipelines[ticker].predict(test_df)
-        signal_df = pd.DataFrame({'Signal': signal}, index=test_df.index)
-        signal_df.to_csv(f'{signal_path}/{ticker}.csv')
+            Path(f'{signal_path}/{system_type}').mkdir(exist_ok=True)
+            signal_df.to_csv(f'{signal_path}/{system_type}/{ticker}.csv')
+
+
+def main():
+    with open('./project_config.json', 'r') as config_file:
+        config = json.load(config_file)
+
+    tickers_train_path = config['data']['train_path']
+    tickers_test_path = config['data']['test_path']
+    target_feature_path = config['data']['target_var_path']
+    tickers = config['tickers']
+    signal_path = config['data']['signal_path']
+    pca_settings = config['modelling']['pca']
+    xgboost_settings = config['modelling']['xgboost']
+
+    perform_modelling(
+        tickers,
+        tickers_train_path,
+        tickers_test_path,
+        target_feature_path,
+        signal_path,
+        pca_settings,
+        xgboost_settings,
+    )
 
 
 if __name__ == '__main__':
