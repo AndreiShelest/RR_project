@@ -4,8 +4,8 @@ import pandas as pd
 from system_types import system_types
 from pathlib import Path
 import numpy as np
-from constants import date_index_label, signal_label
-from strategies import TradingStrategy
+from constants import date_index_label, signal_label, buy_hold_system
+from strategies import TradingStrategy, BuyAndHoldStrategy
 
 
 _return_label = "Return"
@@ -15,7 +15,7 @@ _bh_return_label = "B&H Return"
 _sharpe_label = "Sharpe Ratio"
 _mdd_label = "Max Drawdown"
 _accuracy_label = "Accuracy"
-_transactions_label = "Transactions"
+_transactions_label = "Positions Taken"
 
 _strategy_metrics = [
     ("Return [%]", _return_label),
@@ -42,6 +42,20 @@ def _validate_amount_of_trades(signal: pd.Series, trades_actual):
     )
 
 
+def _run_bh_strategy(test_df):
+    backtest = Backtest(
+        data=test_df,
+        strategy=BuyAndHoldStrategy,
+        cash=100000,
+        commission=0,
+        trade_on_close=True,
+    )
+    results = backtest.run()
+    results.rename(dict(_strategy_metrics), inplace=True)
+
+    return results
+
+
 def main():
     with open('./project_config.json', 'r') as config_file:
         config = json.load(config_file)
@@ -52,6 +66,12 @@ def main():
 
     basic_stats_data = {}
 
+    def assign_basis_stats(system_type, results):
+        if basic_stats_data.get(system_type) is None:
+            basic_stats_data[system_type] = pd.DataFrame(index=_strategy_metrics_labels)
+            basic_stats_data[system_type].index.name = 'Metric'
+        basic_stats_data[system_type][ticker] = results
+
     for ticker in tickers:
         test_df = pd.read_csv(
             f'{tickers_test_path}/{ticker}.csv', index_col=date_index_label
@@ -60,6 +80,9 @@ def main():
         test_df['Open'] = test_df['Close']
         test_df['High'] = test_df['Close']
         test_df['Low'] = test_df['Close']
+
+        bh_results = _run_bh_strategy(test_df)
+        assign_basis_stats(buy_hold_system, bh_results)
 
         for system_type in system_types:
             signal_df = pd.read_csv(
@@ -80,15 +103,9 @@ def main():
                 trade_on_close=True,
             )
             results = backtest.run()
-
             results.rename(dict(_strategy_metrics), inplace=True)
 
-            if basic_stats_data.get(system_type) is None:
-                basic_stats_data[system_type] = pd.DataFrame(
-                    index=_strategy_metrics_labels
-                )
-                basic_stats_data[system_type].index.name = 'Metric'
-            basic_stats_data[system_type][ticker] = results
+            assign_basis_stats(system_type, results)
 
             print(
                 f'[{system_type}] Ticker={ticker}, Strategy Return={results[_return_label]}, B&H={results[_bh_return_label]}'

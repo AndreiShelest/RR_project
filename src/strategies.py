@@ -17,3 +17,12 @@ class TradingStrategy(Strategy):
             self.buy()
         elif curr_signal == 0 and prev_signal == 1 and self.position:
             self.position.close()
+
+
+class BuyAndHoldStrategy(Strategy):
+    def init(self):
+        super().init()
+        self.buy()
+
+    def next(self):
+        super().next()
