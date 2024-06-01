@@ -3,7 +3,6 @@ from sklearn.pipeline import Pipeline
 from sklearn.decomposition import PCA
 import pandas as pd
 import json
-from features import imputation
 from xgboost import XGBClassifier
 from sklearn.base import TransformerMixin, BaseEstimator
 
@@ -48,11 +47,12 @@ def main():
 
     for ticker in tickers:
         train_df = pd.read_csv(f'{tickers_train_path}/{ticker}.csv', index_col='Date')
+        train_df.dropna(inplace=True)
+
         train_feat_df = pd.read_csv(
             f'{target_feature_path}/{ticker}.csv', index_col='Date'
         ).loc[train_df.index]
 
-        ind_imputer = imputation.IndicatorImputer()
         pca = PCA(n_components=pca_components)
         bst = XGBClassifier(
             booster='gbtree',
@@ -62,7 +62,6 @@ def main():
         )
 
         pipeline_steps = [
-            ('imputer', ind_imputer),
             ('normalizer', MinMaxScaler()),
             ('pca', pca),
             ('debug', Debug(ticker, train_df.index, interim_train_path)),
