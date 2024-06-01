@@ -1,6 +1,7 @@
 from backtesting import Strategy, Backtest
 import json
 import pandas as pd
+from system_types import system_types
 
 
 class TradingStrategy(Strategy):
@@ -16,7 +17,7 @@ class TradingStrategy(Strategy):
             self.buy()
         elif curr_signal == 0 and self.prev_signal == 1:
             self.sell()
-        
+
         self.idx += 1
         self.prev_signal = curr_signal
 
@@ -32,22 +33,25 @@ def main():
         test_df = pd.read_csv(f'{tickers_test_path}/{ticker}.csv', index_col='Date')
         test_df.index = pd.to_datetime(test_df.index)
 
-        signal_df = pd.read_csv(f'{signal_path}/{ticker}.csv', index_col='Date')
-        signal_df.index = pd.to_datetime(signal_df.index)
+        for system_type in system_types:
+            signal_df = pd.read_csv(
+                f'{signal_path}/{system_type}/{ticker}.csv', index_col='Date'
+            )
+            signal_df.index = pd.to_datetime(signal_df.index)
 
-        joined_df = test_df.join(signal_df, how='inner')
+            joined_df = test_df.join(signal_df, how='inner')
 
-        print(
-            f'[Strategy] Join kept all data: {len(test_df) == len(joined_df) and len(signal_df) == len(joined_df)}'
-        )
+            print(
+                f'[{system_type}] Join kept all data: {len(test_df) == len(joined_df) and len(signal_df) == len(joined_df)}'
+            )
 
-        backtest = Backtest(
-            data=joined_df, strategy=TradingStrategy, cash=10000, commission=0
-        )
-        results = backtest.run()
-        print(
-            f'Ticker={ticker}, Strategy={results["Return [%]"]}, B&H={results["Buy & Hold Return [%]"]}'
-        )
+            backtest = Backtest(
+                data=joined_df, strategy=TradingStrategy, cash=100000, commission=0
+            )
+            results = backtest.run()
+            print(
+                f'[{system_type}] Ticker={ticker}, Strategy Return={results["Return [%]"]}, B&H={results["Buy & Hold Return [%]"]}'
+            )
 
     return
 
