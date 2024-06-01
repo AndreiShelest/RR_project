@@ -18,6 +18,7 @@
         "target_var_path": "./data/processed/target_var",
         "signal_path": "./strategies_data/signals",
         "basic_stats_path": "./strategies_data/performance/basic_stats",
+        "time_series_stats_path": "./strategies_data/performance/time_series_stats",
         "over_time_stats_path": "./strategies_data/performance/over_time_stats",
         "models_path": "./models"
     },
@@ -36,5 +37,9 @@
             "objective": "binary:logistic",
             "eval_metric": "auc"
         }
-    }
+    },
+    "strategy": {
+        "initial_cash": 100000
+    },
+    "seed": 12345
 }
