@@ -1,31 +1,11 @@
-from backtesting import Strategy, Backtest
+from backtesting import Backtest
 import json
 import pandas as pd
 from system_types import system_types
 from pathlib import Path
 import numpy as np
-
-
-class TradingStrategy(Strategy):
-    _my_size = 0.9999
-
-    def init(self):
-        super().init()
-
-        if self.data['Signal'][0] == 1:
-            self.buy(size=self._my_size)
-
-    def next(self):
-        curr_signal = self.data['Signal'][-1]
-        prev_signal = self.data['Signal'][-2]
-
-        # print(self.data.index[-1], self.data.Close[-1], self.data['Signal'][-1])
-
-        if curr_signal == 1 and prev_signal == 0 and not self.position:
-            self.buy(size=self._my_size)
-        elif curr_signal == 0 and prev_signal == 1 and self.position:
-            self.position.close()
-            # print(self.data.index[-1], self.data.Close[-1], self.equity)
+from constants import date_index_label, signal_label
+from strategies import TradingStrategy
 
 
 _return_label = "Return"
@@ -49,10 +29,18 @@ _strategy_metrics = [
 ]
 _strategy_metrics_labels = [label_pair[1] for label_pair in _strategy_metrics]
 
+
 def _validate_amount_of_trades(signal: pd.Series, trades_actual):
-    shifted_signal = np.pad(signal, pad_width=(0, 1), constant_values=(0, signal.iat[-1]))[1:]
-    trades_required = (np.abs(shifted_signal - signal) > 0).sum() // 2 + (1 if signal.iat[0] == 1 else 0)
-    print(f'Trades required={trades_required}, trades actual={trades_actual}, valid={trades_required == trades_actual}')
+    shifted_signal = np.pad(
+        signal, pad_width=(0, 1), constant_values=(0, signal.iat[-1])
+    )[1:]
+    trades_required = (np.abs(shifted_signal - signal) > 0).sum() // 2 + (
+        1 if signal.iat[0] == 1 else 0
+    )
+    print(
+        f'Trades required={trades_required}, trades actual={trades_actual}, valid={trades_required == trades_actual}'
+    )
+
 
 def main():
     with open('./project_config.json', 'r') as config_file:
@@ -65,7 +53,9 @@ def main():
     basic_stats_data = {}
 
     for ticker in tickers:
-        test_df = pd.read_csv(f'{tickers_test_path}/{ticker}.csv', index_col='Date')
+        test_df = pd.read_csv(
+            f'{tickers_test_path}/{ticker}.csv', index_col=date_index_label
+        )
         test_df.index = pd.to_datetime(test_df.index)
         test_df['Open'] = test_df['Close']
         test_df['High'] = test_df['Close']
@@ -73,7 +63,7 @@ def main():
 
         for system_type in system_types:
             signal_df = pd.read_csv(
-                f'{signal_path}/{system_type}/{ticker}.csv', index_col='Date'
+                f'{signal_path}/{system_type}/{ticker}.csv', index_col=date_index_label
             )
             signal_df.index = pd.to_datetime(signal_df.index)
 
@@ -87,7 +77,7 @@ def main():
                 strategy=TradingStrategy,
                 cash=100000,
                 commission=0,
-                trade_on_close=True
+                trade_on_close=True,
             )
             results = backtest.run()
 
@@ -104,8 +94,7 @@ def main():
                 f'[{system_type}] Ticker={ticker}, Strategy Return={results[_return_label]}, B&H={results[_bh_return_label]}'
             )
 
-            _validate_amount_of_trades(signal_df['Signal'], len(results['_trades']))
-
+            _validate_amount_of_trades(signal_df[signal_label], len(results['_trades']))
 
     for system_type in basic_stats_data:
         basic_stats_data[system_type].to_csv(f'{basic_stats_path}/{system_type}.csv')

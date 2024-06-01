@@ -36,5 +36,6 @@
             "objective": "binary:logistic",
             "eval_metric": "auc"
         }
-    }
+    },
+    "seed": 12345
 }

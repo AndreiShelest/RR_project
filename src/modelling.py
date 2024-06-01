@@ -6,6 +6,7 @@ from xgboost import XGBClassifier
 from sklearn.base import TransformerMixin, BaseEstimator
 from pathlib import Path
 from system_types import create_pipeline, system_types
+from constants import date_index_label, signal_label
 
 
 class Debug(BaseEstimator, TransformerMixin):
@@ -40,12 +41,13 @@ def _generate_test_signal(
     Y_test: pd.DataFrame,
     pca_settings,
     xgboost_settings,
+    seed,
 ):
     model = create_pipeline(
         system_type,
         normalizer=MinMaxScaler(),
         pca=PCA(**pca_settings),
-        xgboost=XGBClassifier(**xgboost_settings),
+        xgboost=XGBClassifier(**xgboost_settings, seed=seed),
     )
     model.fit(X_train, Y_train)
 
@@ -54,7 +56,7 @@ def _generate_test_signal(
 
     signal = model.predict(X_test)
 
-    signal_df = pd.DataFrame({'Signal': signal}, index=X_test.index)
+    signal_df = pd.DataFrame({signal_label: signal}, index=X_test.index)
     return signal_df
 
 
@@ -66,18 +68,23 @@ def perform_modelling(
     signal_path,
     pca_settings,
     xgboost_settings,
+    seed,
 ):
     for ticker in tickers:
-        train_df = pd.read_csv(f'{tickers_train_path}/{ticker}.csv', index_col='Date')
+        train_df = pd.read_csv(
+            f'{tickers_train_path}/{ticker}.csv', index_col=date_index_label
+        )
         train_df.dropna(inplace=True)
 
         train_feat_df = pd.read_csv(
-            f'{target_feature_path}/{ticker}.csv', index_col='Date'
+            f'{target_feature_path}/{ticker}.csv', index_col=date_index_label
         ).loc[train_df.index]
 
-        test_df = pd.read_csv(f'{tickers_test_path}/{ticker}.csv', index_col='Date')
+        test_df = pd.read_csv(
+            f'{tickers_test_path}/{ticker}.csv', index_col=date_index_label
+        )
         test_feat_df = pd.read_csv(
-            f'{target_feature_path}/{ticker}.csv', index_col='Date'
+            f'{target_feature_path}/{ticker}.csv', index_col=date_index_label
         ).loc[test_df.index]
 
         for system_type in system_types:
@@ -90,6 +97,7 @@ def perform_modelling(
                 test_feat_df,
                 pca_settings,
                 xgboost_settings,
+                seed,
             )
 
             Path(f'{signal_path}/{system_type}').mkdir(exist_ok=True)
@@ -107,6 +115,7 @@ def main():
     signal_path = config['data']['signal_path']
     pca_settings = config['modelling']['pca']
     xgboost_settings = config['modelling']['xgboost']
+    seed = config['seed']
 
     perform_modelling(
         tickers,
@@ -116,6 +125,7 @@ def main():
         signal_path,
         pca_settings,
         xgboost_settings,
+        seed,
     )
 
 
