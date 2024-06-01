@@ -16,7 +16,8 @@
         "test_path": "./data/processed/split/test",
         "interim_train_path": "./data/interim/train",
         "target_var_path": "./data/processed/target_var",
-        "signal_path": "./data/processed/signals"
+        "signal_path": "./data/processed/signals",
+        "models_path": "./models"
     },
     "modelling": {
         "split": {
