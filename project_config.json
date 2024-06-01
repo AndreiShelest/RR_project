@@ -27,6 +27,12 @@
         },
         "pca": {
             "components": 6
+        },
+        "xgboost": {
+            "booster": "gbtree",
+            "n_estimators": 100,
+            "objective": "binary:logistic",
+            "eval_metric": "auc"
         }
     }
 }
