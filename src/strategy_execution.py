@@ -4,7 +4,13 @@ import pandas as pd
 from system_types import system_types
 from pathlib import Path
 import numpy as np
-from constants import date_index_label, signal_label, buy_hold_system
+from constants import (
+    date_index_label,
+    signal_label,
+    buy_hold_system,
+    equity_label,
+    equity_curve_label,
+)
 from strategies import TradingStrategy, BuyAndHoldStrategy
 
 
@@ -62,15 +68,26 @@ def main():
     tickers_test_path = config['data']['test_path']
     signal_path = config['data']['signal_path']
     basic_stats_path = config['data']['basic_stats_path']
+    ts_stats_path = config['data']['time_series_stats_path']
     tickers = config['tickers']
 
     basic_stats_data = {}
+    time_series_data = {}
 
-    def assign_basis_stats(system_type, results):
+    def assign_basic_stats(system_type, ticker, results):
         if basic_stats_data.get(system_type) is None:
             basic_stats_data[system_type] = pd.DataFrame(index=_strategy_metrics_labels)
             basic_stats_data[system_type].index.name = 'Metric'
         basic_stats_data[system_type][ticker] = results
+
+    def assign_ts_stats(system_type, ticker, results):
+        if time_series_data.get(equity_label) is None:
+            time_series_data[equity_label] = {}
+        if time_series_data[equity_label].get(ticker) is None:
+            time_series_data[equity_label][ticker] = pd.DataFrame()
+        time_series_data[equity_label][ticker][system_type] = results[
+            equity_curve_label
+        ][equity_label]
 
     for ticker in tickers:
         test_df = pd.read_csv(
@@ -82,7 +99,8 @@ def main():
         test_df['Low'] = test_df['Close']
 
         bh_results = _run_bh_strategy(test_df)
-        assign_basis_stats(buy_hold_system, bh_results)
+        assign_basic_stats(buy_hold_system, ticker, bh_results)
+        assign_ts_stats(buy_hold_system, ticker, bh_results)
 
         for system_type in system_types:
             signal_df = pd.read_csv(
@@ -105,7 +123,8 @@ def main():
             results = backtest.run()
             results.rename(dict(_strategy_metrics), inplace=True)
 
-            assign_basis_stats(system_type, results)
+            assign_basic_stats(system_type, ticker, results)
+            assign_ts_stats(system_type, ticker, results)
 
             print(
                 f'[{system_type}] Ticker={ticker}, Strategy Return={results[_return_label]}, B&H={results[_bh_return_label]}'
@@ -115,6 +134,14 @@ def main():
 
     for system_type in basic_stats_data:
         basic_stats_data[system_type].to_csv(f'{basic_stats_path}/{system_type}.csv')
+
+    for ts_label in time_series_data:
+        Path(f'{ts_stats_path}/{ts_label}').mkdir(exist_ok=True)
+
+        for ticker in time_series_data[ts_label]:
+            time_series_data[ts_label][ticker].to_csv(
+                f'{ts_stats_path}/{ts_label}/{ticker}.csv'
+            )
 
     return
 
