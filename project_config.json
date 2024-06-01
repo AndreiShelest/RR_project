@@ -16,7 +16,9 @@
         "test_path": "./data/processed/split/test",
         "interim_train_path": "./data/interim/train",
         "target_var_path": "./data/processed/target_var",
-        "signal_path": "./data/processed/signals",
+        "signal_path": "./strategies_data/signals",
+        "basic_stats_path": "./strategies_data/performance/basic_stats",
+        "over_time_stats_path": "./strategies_data/performance/over_time_stats",
         "models_path": "./models"
     },
     "modelling": {
@@ -26,7 +28,13 @@
             "gap": 100
         },
         "pca": {
-            "components": 6
+            "n_components": 6
+        },
+        "xgboost": {
+            "booster": "gbtree",
+            "n_estimators": 100,
+            "objective": "binary:logistic",
+            "eval_metric": "auc"
         }
     }
 }
