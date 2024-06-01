@@ -5,6 +5,7 @@ import pandas as pd
 import json
 from xgboost import XGBClassifier
 from sklearn.base import TransformerMixin, BaseEstimator
+import pywt
 
 
 class Debug(BaseEstimator, TransformerMixin):
@@ -28,6 +29,24 @@ class Debug(BaseEstimator, TransformerMixin):
 
         transformed_df.to_csv(f'{self.interim_path}/{self.ticker}.csv')
         return self
+    
+    def wavelet_transform(self, x, params):
+
+        basis = params.get('basis')
+        level = params.get('decomposition_level')
+        threshold = params.get('threshold', 0.5)
+        thresholding_method = params.get('thresholding_method', 'soft')
+
+        coeffs = pywt.dwt(x, basis, level)
+        coeffs_thresholded = [coeffs[0]]
+        for cD in coeffs[1:]:
+        cD_thresholded = pywt.threshold(cD, threshold, mode=thresholding_method)
+        coeffs_thresholded.append(cD_thresholded)
+        
+        
+        denoised_signal = pywt.waverec(coeffs_thresholded, wavelet)
+    
+        return denoised_signal
 
 
 def main():

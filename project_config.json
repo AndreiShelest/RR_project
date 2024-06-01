@@ -27,6 +27,11 @@
         },
         "pca": {
             "components": 6
+        },
+        "dwt": {
+            "basis": "haar",
+            "decomposition_levels": 5
         }
+
     }
 }
