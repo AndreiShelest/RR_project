@@ -1,11 +1,11 @@
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.pipeline import Pipeline
 from sklearn.decomposition import PCA
 import pandas as pd
 import json
 from xgboost import XGBClassifier
 from sklearn.base import TransformerMixin, BaseEstimator
 from pathlib import Path
+from system_types import create_pipeline, system_types
 
 
 class Debug(BaseEstimator, TransformerMixin):
@@ -45,22 +45,13 @@ def _generate_test_signal(
 
     xgboost_settings = config['modelling']['xgboost']
 
-    pipeline_steps_map = {
-        'without_pca': [
-            ('normalizer', MinMaxScaler()),
-            ('xgboost', XGBClassifier(**xgboost_settings)),
-        ],
-        'with_pca': [
-            ('normalizer', MinMaxScaler()),
-            ('pca', PCA(n_components=pca_components)),
-            ('xgboost', XGBClassifier(**xgboost_settings)),
-        ],
-    }
-
-    for system_type in pipeline_steps_map:
-        pipeline_steps = pipeline_steps_map[system_type]
-
-        model = Pipeline(pipeline_steps)
+    for system_type in system_types:
+        model = create_pipeline(
+            system_type,
+            normalizer=MinMaxScaler(),
+            pca=PCA(n_components=pca_components),
+            xgboost=XGBClassifier(**xgboost_settings),
+        )
         model.fit(X_train, Y_train)
 
         test_score = model.score(X_test, Y_test)
