@@ -6,6 +6,8 @@ import json
 from xgboost import XGBClassifier
 from sklearn.base import TransformerMixin, BaseEstimator
 import pywt
+import numpy as np
+from skimage.restoration import denoise_wavelet
 
 
 class Debug(BaseEstimator, TransformerMixin):
@@ -30,24 +32,73 @@ class Debug(BaseEstimator, TransformerMixin):
         transformed_df.to_csv(f'{self.interim_path}/{self.ticker}.csv')
         return self
     
-    def wavelet_transform(self, x, params):
+class Wavelet(BaseEstimator, TransformerMixin):
 
-        basis = params.get('basis')
-        level = params.get('decomposition_level')
-        threshold = params.get('threshold', 0.5)
-        thresholding_method = params.get('thresholding_method', 'soft')
+    def __init__(self, ticker, df_index, interim_path, mode, level, wavelet) -> None:
+        self.ticker = ticker
+        self.df_index = df_index
+        self.interim_path = interim_path
+        self.wavelet = wavelet
+        self.mode = mode
+        self.level = level
 
-        coeffs = pywt.dwt(x, basis, level)
-        coeffs_thresholded = [coeffs[0]]
-        for cD in coeffs[1:]:
-        cD_thresholded = pywt.threshold(cD, threshold, mode=thresholding_method)
-        coeffs_thresholded.append(cD_thresholded)
-        
-        
-        denoised_signal = pywt.waverec(coeffs_thresholded, wavelet)
+    def fit(self, X, y=None):
+        # Calculate the thresholds from the training data
+        self.train_data_ = X.copy()
+
+        self.thresholds_ = []
+
+        n_features = X.shape[1]
+
+        for feature_idx in range(n_features):
+            # each feature is done separetely
+            feature_data = X[:, feature_idx]
+            coeffs = pywt.wavedec(feature_data, self.wavelet, level=self.level)
+
+            threshold = self.threshold_coefficients(coeffs)
+            self.thresholds_.append(threshold)
+        return self
     
-        return denoised_signal
+    def threshold_coefficients(self, coeffs):
+        # applies thresholding optimisation
+        return denoise_wavelet(coeffs, method='BayesShrink', mode=self.mode, wavelet_levels=len(coeffs)-1, wavelet=coeffs[0].wavelet.name, rescale_sigma=True)
 
+    def transform(self, X, y=None):
+        # incremental denoising
+        n_samples, n_features = X.shape
+        X_denoised = np.zeros_like(X)
+
+        for feature_idx in range(n_features):
+            feature_data = X[:, feature_idx]
+            train_feature_data = self.train_data_[:, feature_idx]
+            denoised_feature_data = np.zeros(n_samples)
+            extended_data = np.concatenate([train_feature_data, feature_data])
+
+            for i in range(n_samples):
+                data_point = extended_data[len(train_feature_data) + i]
+                data_up_to_point = extended_data[:len(train_feature_data) + i + 1]
+
+                coeffs = pywt.wavedec(data_up_to_point, self.wavelet, level=self.level)
+                coeffs_thresholded = self.threshold_coefficients(coeffs)
+                denoised_signal = self.reconstruct_signal(coeffs_thresholded)
+
+                denoised_point = denoised_signal[-1]
+                denoised_feature_data[i] = denoised_point
+
+            X_denoised[:, feature_idx] = denoised_feature_data
+
+        return X_denoised
+
+    
+    # def process_data_point(self, data, new_point):
+    #     extended_data = np.append(data, new_point)
+    #     coeffs = pywt.wavedec(extended_data, self.wavelet, level=self.level)
+    #     return coeffs
+    
+    def reconstruct_signal(self, coeffs):
+        return pywt.waverec(coeffs, self.wavelet)
+
+    
 
 def main():
     with open('./project_config.json', 'r') as config_file:
@@ -61,6 +112,11 @@ def main():
     tickers = config['tickers']
 
     pca_components = config['modelling']['pca']['components']
+    dwt_param = config['modelling']['dwt']
+    mode=dwt_param["mode"]
+    level=dwt_param['decomposition_level']
+    wavelet=dwt_param['wavelet']
+
 
     pipelines = {}
 
@@ -72,7 +128,9 @@ def main():
             f'{target_feature_path}/{ticker}.csv', index_col='Date'
         ).loc[train_df.index]
 
+        
         pca = PCA(n_components=pca_components)
+        dwt = Wavelet(mode, level, wavelet)
         bst = XGBClassifier(
             booster='gbtree',
             n_estimators=100,
@@ -80,9 +138,11 @@ def main():
             eval_metric='auc',
         )
 
+
         pipeline_steps = [
             ('normalizer', MinMaxScaler()),
             ('pca', pca),
+            ('dwt', dwt)
             ('debug', Debug(ticker, train_df.index, interim_train_path)),
             ('xgboost', bst),
         ]

@@ -29,8 +29,9 @@
             "components": 6
         },
         "dwt": {
-            "basis": "haar",
-            "decomposition_levels": 5
+            "wavelet": "haar",
+            "decomposition_level": 5,
+            "mode": "soft"
         }
 
     }
