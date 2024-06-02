@@ -112,6 +112,7 @@ def main():
     tickers = config['tickers']
 
     pca_components = config['modelling']['pca']['components']
+
     dwt_param = config['modelling']['dwt']
     mode=dwt_param["mode"]
     level=dwt_param['decomposition_level']
@@ -142,7 +143,7 @@ def main():
         pipeline_steps = [
             ('normalizer', MinMaxScaler()),
             ('pca', pca),
-            ('dwt', dwt)
+            ('dwt', dwt),
             ('debug', Debug(ticker, train_df.index, interim_train_path)),
             ('xgboost', bst),
         ]
