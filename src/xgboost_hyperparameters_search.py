@@ -1,9 +1,26 @@
 import pandas as pd
+import numpy as np
 from sklearn.pipeline import Pipeline
 from xgboost import XGBClassifier
 from strategies import TradingStrategy
 from backtesting import Backtest
 from constants import signal_label, strategy_metrics, accuracy_label, sharpe_label
+from deap import base, tools
+
+_learning_rate_label = 'learning_rate'
+_max_depth_label = ('max_depth',)
+_min_child_weight = 'min_child_weight'
+_subsample = 'subsample'
+
+_xgboost_hyperparams = [
+    _learning_rate_label,
+    _max_depth_label,
+    _min_child_weight,
+    _subsample,
+]
+
+_n_ind = 128
+_n_gen = 100
 
 
 def _xgboost_fitness(
@@ -36,6 +53,26 @@ def _xgboost_fitness(
     return (accuracy, sharpe, score)
 
 
+def _generate_parameters(param_name, size, rng):
+    if param_name == _learning_rate_label:
+        return rng.random(size=size)
+    if param_name == _max_depth_label:
+        return rng.integers(low=0, high=20, size=size)
+    if param_name == _min_child_weight:
+        return rng.integers(low=0, high=100, size=size)
+    if param_name == _subsample:
+        return rng.random(size=size)
+
+    raise f'Incorrect parameter: {param_name}'
+
+
+def _generate_population(size, rng):
+    gen_params = [
+        _generate_parameters(param, size, rng) for param in _xgboost_hyperparams
+    ]
+    return list(zip(*gen_params))
+
+
 def find_xgboost_hyperparameters(
     ticker,
     X_train: pd.DataFrame,
@@ -49,5 +86,22 @@ def find_xgboost_hyperparameters(
 ):
     Xm_train = transformer.fit_transform(X_train)
     Xm_val = transformer.transform(X_val)
+
+    rng = np.random.default_rng(seed=seed)
+
+    population = _generate_population(_n_ind, rng)
+
+    toolbox = base.Toolbox()
+    toolbox.register(
+        'evaluate',
+        _xgboost_fitness,
+        ticker=ticker,
+        X_val=Xm_val,
+        Y_val=Y_val,
+        strategy_settings=strategy_settings,
+    )
+    toolbox.register('population', tools.initIterate, list, lambda: iter(population))
+
+    pop = toolbox.population()
 
     return
