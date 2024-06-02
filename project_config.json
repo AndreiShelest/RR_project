@@ -40,7 +40,17 @@
             "booster": "gbtree",
             "n_estimators": 100,
             "objective": "binary:logistic",
-            "eval_metric": "auc"
+            "eval_metric": "auc",
+            "optimisation": "True"
+        },
+        "optimisation_param": {
+            "n_individuals": 128,
+            "n_generations": 100 ,
+            "patience": 10,
+            "crossover": 0.5,
+            "mutation_prob": 0.2,
+            "hypermutation_increase1": 0.1,
+            "hypermutation_increase2": 0.15
         }
     },
     "strategy": {
