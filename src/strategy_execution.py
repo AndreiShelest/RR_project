@@ -28,12 +28,12 @@ def _validate_amount_of_trades(signal: pd.Series, trades_actual):
     )
 
 
-def _run_bh_strategy(test_df, initial_cash):
+def _run_bh_strategy(test_df, initial_cash, commission):
     backtest = Backtest(
         data=test_df,
         strategy=BuyAndHoldStrategy,
         cash=initial_cash,
-        commission=0,
+        commission=commission,
         trade_on_close=True,
     )
     results = backtest.run()
@@ -50,6 +50,7 @@ def main():
     basic_stats_path = config['data']['basic_stats_path']
     ts_stats_path = config['data']['time_series_stats_path']
     tickers = config['tickers']
+    commissions = config['strategy']['commissions']
     initial_cash = config['strategy']['initial_cash']
 
     basic_stats_data = {}
@@ -61,27 +62,39 @@ def main():
             basic_stats_data[system_type].index.name = 'Metric'
         basic_stats_data[system_type][ticker] = results
 
-    def assign_ts_stats(system_type, ticker, results):
+    def assign_ts_stats(system_type, ticker, results, initial_cash):
         if time_series_data.get(equity_label) is None:
             time_series_data[equity_label] = {}
         if time_series_data[equity_label].get(ticker) is None:
             time_series_data[equity_label][ticker] = pd.DataFrame()
-        time_series_data[equity_label][ticker][system_type] = results[
-            equity_curve_label
-        ][equity_label]
+
+        # shift it since backtesting.py saves the equity of the next day in the previous day somehow
+        original_ec = results[equity_curve_label][equity_label]
+        shifted_ec = np.pad(
+            original_ec, pad_width=(1, 0), constant_values=(initial_cash, np.NaN)
+        )[: len(original_ec)]
+        shifted_ec = pd.Series(shifted_ec, index=original_ec.index)
+
+        time_series_data[equity_label][ticker][system_type] = shifted_ec
 
     for ticker in tickers:
         test_df = pd.read_csv(
             f'{tickers_test_path}/{ticker}.csv', index_col=date_index_label
         )
         test_df.index = pd.to_datetime(test_df.index)
-        test_df['Open'] = test_df['Close']
+        test_df['Open'] = np.pad(
+            test_df['Close'],
+            pad_width=(1, 0),
+            constant_values=(test_df['Close'].iat[0], np.NaN),
+        )[: len(test_df)]
         test_df['High'] = test_df['Close']
         test_df['Low'] = test_df['Close']
 
-        bh_results = _run_bh_strategy(test_df, initial_cash)
+        commission = commissions[ticker]
+
+        bh_results = _run_bh_strategy(test_df, initial_cash, commission)
         assign_basic_stats(buy_hold_system, ticker, bh_results)
-        assign_ts_stats(buy_hold_system, ticker, bh_results)
+        assign_ts_stats(buy_hold_system, ticker, bh_results, initial_cash)
 
         for system_type in system_types:
             signal_df = pd.read_csv(
@@ -98,14 +111,14 @@ def main():
                 data=joined_df,
                 strategy=TradingStrategy,
                 cash=initial_cash,
-                commission=0,
+                commission=commission,
                 trade_on_close=True,
             )
             results = backtest.run()
             results.rename(dict(strategy_metrics), inplace=True)
 
             assign_basic_stats(system_type, ticker, results)
-            assign_ts_stats(system_type, ticker, results)
+            assign_ts_stats(system_type, ticker, results, initial_cash)
 
             print(
                 f'[{system_type}] Ticker={ticker}, Strategy Return={results[return_label]}, B&H={results[bh_return_label]}'

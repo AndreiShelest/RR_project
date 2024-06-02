@@ -8,7 +8,7 @@ You can restore the conda environment from the *environment.yml* file included i
 
 # How to Run the Project
 
-There are several essential scripts to be run in order to download and prepare the data for the modelling. In order to facilitate the process, the first four steps can be performed one by one with ```./data/data_generation.py``` script.
+There are several essential scripts to be run in order to download and prepare the data for the modelling. In order to facilitate the process, the first four steps can be performed one by one with ```./src/data_generation.py``` script.
 
 - Firstly, execute ```./src/data/tickers_loader.py``` module to download ticker data from Yahoo Finance.
 - Next, generate target feature (Buy or Sell) by executing ```./src/data/target_feature.py```.

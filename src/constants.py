@@ -1,14 +1,14 @@
-
-
 date_index_label = 'Date'
 signal_label = 'Signal'
 
 buy_hold_system = 'b&h'
 without_pca_system = 'without_pca'
+with_pca_system = 'with_pca'
 with_pca_and_dwt_system = 'with_pca_and_dwt'
 system_titles = {
-    buy_hold_system: 'Buy&Hold',
+    buy_hold_system: 'Buy & Hold',
     without_pca_system: 'Basic',
+    with_pca_system: 'PCA',
     with_pca_and_dwt_system: 'PCA & DWT',
 }
 

@@ -34,6 +34,7 @@ class Debug(BaseEstimator, TransformerMixin):
         transformed_df.to_csv(f'{self.interim_path}/{self.ticker}.csv')
         return self
 
+
 class Wavelet(BaseEstimator, TransformerMixin):
 
     def __init__(self, mode, level, wavelet) -> None:
@@ -60,13 +61,21 @@ class Wavelet(BaseEstimator, TransformerMixin):
             threshold = self.threshold_coefficients(coeffs)
             self.thresholds_.append(threshold)
         return self
-    
+
     def threshold_coefficients(self, coeffs):
         # applies thresholding optimisation
         denoised_coeffs = [coeffs[0]]  # Keep approximation coefficients intact
         denoised_coeffs += [
-            denoise_wavelet(c, method='BayesShrink', mode=self.mode, wavelet_levels=self.level, wavelet=self.wavelet, rescale_sigma=True)
-            for c in coeffs[1:]]
+            denoise_wavelet(
+                c,
+                method='BayesShrink',
+                mode=self.mode,
+                wavelet_levels=self.level,
+                wavelet=self.wavelet,
+                rescale_sigma=True,
+            )
+            for c in coeffs[1:]
+        ]
         return denoised_coeffs
 
     def transform(self, X, y=None):
@@ -82,7 +91,7 @@ class Wavelet(BaseEstimator, TransformerMixin):
 
             for i in range(n_samples):
                 data_point = extended_data[len(train_feature_data) + i]
-                data_up_to_point = extended_data[:len(train_feature_data) + i + 1]
+                data_up_to_point = extended_data[: len(train_feature_data) + i + 1]
 
                 coeffs = pywt.wavedec(data_up_to_point, self.wavelet, level=self.level)
                 coeffs_thresholded = self.threshold_coefficients(coeffs)
@@ -95,7 +104,6 @@ class Wavelet(BaseEstimator, TransformerMixin):
 
         return X_denoised
 
-    
     def reconstruct_signal(self, coeffs):
         return pywt.waverec(coeffs, self.wavelet)
 
@@ -120,6 +128,11 @@ def _generate_test_signal(
         xgboost=XGBClassifier(**xgboost_settings, seed=seed),
     )
     model.fit(X_train, Y_train)
+
+    if model.named_steps.get('pca') is not None:
+        print(
+            f'System={system_type}, ticker={ticker}, PCA components={model["pca"].n_components_}'
+        )
 
     test_score = model.score(X_test, Y_test)
     print(f'System={system_type}, ticker={ticker}, test_score={test_score}')
