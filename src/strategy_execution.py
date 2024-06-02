@@ -41,6 +41,20 @@ def _run_bh_strategy(test_df, initial_cash, commission):
 
     return results
 
+def read_ticker_info_for_strategy(ticker, path):
+    ticker_df = pd.read_csv(
+        f'{path}/{ticker}.csv', index_col=date_index_label
+    )
+    ticker_df.index = pd.to_datetime(ticker_df.index)
+    ticker_df['Open'] = np.pad(
+        ticker_df['Close'],
+        pad_width=(1, 0),
+        constant_values=(ticker_df['Close'].iat[0], np.NaN),
+    )[: len(ticker_df)]
+    ticker_df['High'] = ticker_df['Close']
+    ticker_df['Low'] = ticker_df['Close']
+
+    return ticker_df
 
 def main():
     with open('./project_config.json', 'r') as config_file:
@@ -78,17 +92,7 @@ def main():
         time_series_data[equity_label][ticker][system_type] = shifted_ec
 
     for ticker in tickers:
-        test_df = pd.read_csv(
-            f'{tickers_test_path}/{ticker}.csv', index_col=date_index_label
-        )
-        test_df.index = pd.to_datetime(test_df.index)
-        test_df['Open'] = np.pad(
-            test_df['Close'],
-            pad_width=(1, 0),
-            constant_values=(test_df['Close'].iat[0], np.NaN),
-        )[: len(test_df)]
-        test_df['High'] = test_df['Close']
-        test_df['Low'] = test_df['Close']
+        test_df = read_ticker_info_for_strategy(ticker, tickers_test_path)
 
         commission = commissions[ticker]
 

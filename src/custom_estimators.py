@@ -1,6 +1,5 @@
 import pywt
 from skimage.restoration import denoise_wavelet
-from xgboost_hyperparameters_search import find_xgboost_hyperparameters
 from sklearn.base import TransformerMixin, BaseEstimator
 import numpy as np
 import pandas as pd

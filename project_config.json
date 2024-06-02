@@ -40,6 +40,10 @@
             "n_estimators": 100,
             "objective": "binary:logistic",
             "eval_metric": "auc"
+        },
+        "hp_search": {
+            "generations": 100,
+            "pop_size": 128
         }
     },
     "strategy": {
