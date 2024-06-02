@@ -42,8 +42,10 @@
             "eval_metric": "auc"
         },
         "hp_search": {
-            "generations": 100,
-            "pop_size": 128
+            "generations": 4,
+            "pop_size": 4,
+            "crossover_prob": 0.9,
+            "mutation_prob": 0.2
         }
     },
     "strategy": {

@@ -34,8 +34,8 @@ _xgboost_hyperparams = [
 
 
 def _xgboost_fitness(
+    param_set,
     ticker,
-    model: XGBClassifier,
     X_train,
     Y_train: pd.DataFrame,
     X_val,
@@ -43,11 +43,15 @@ def _xgboost_fitness(
     ticker_val_df: pd.DataFrame,
     val_pd_index,
     strategy_settings,
+    xgboost_settings,
 ):
+    combined_params = xgboost_settings | param_set
+    model = XGBClassifier(**combined_params)
+
     model.fit(X_train, Y_train)
 
     signal = model.predict(X_val)
-    score = model.score(X_val, Y_val)
+    # score = model.score(X_val, Y_val)
 
     signal_df = pd.DataFrame({signal_label: signal}, index=val_pd_index)
     signal_df.index = pd.to_datetime(signal_df.index)
@@ -67,6 +71,7 @@ def _xgboost_fitness(
     accuracy = results[accuracy_label] / 100  # it is in percentage
     sharpe = results[sharpe_label]
 
+    # print(f'acc={accuracy}, sharpe={sharpe}')
     return (accuracy, sharpe)
 
 
@@ -103,6 +108,25 @@ def _unregister(toolbox, name):
         toolbox.unregister(name)
 
 
+def _evaluate_fitnesses(toolbox, params_pop):
+    invalid_fit_pop = list(filter(lambda p: not p.fitness.valid, params_pop))
+    fitnesses = list(toolbox.map(toolbox.evaluate, invalid_fit_pop))
+    for ind, fit in zip(invalid_fit_pop, fitnesses):
+        ind.fitness.values = fit
+
+    return fitnesses, len(invalid_fit_pop)
+
+
+def _cxTwoPoint_dict(ind1, ind2, rng):
+    size = len(_xgboost_hyperparams)
+
+    cx_feats = rng.choice(_xgboost_hyperparams, size=rng.integers(1, size + 1))
+    for cx_feat in cx_feats:
+        ind1[cx_feat], ind2[cx_feat] = ind2[cx_feat], ind1[cx_feat]
+
+    return ind1, ind2
+
+
 def find_xgboost_hyperparameters(
     ticker,
     X_train: pd.DataFrame,
@@ -115,6 +139,7 @@ def find_xgboost_hyperparameters(
     transformer: Pipeline,
     seed,
     hp_config,
+    stats,
 ):
     Xm_train = transformer.fit_transform(X_train)
     Xm_val = transformer.transform(X_val)
@@ -125,10 +150,14 @@ def find_xgboost_hyperparameters(
     population_iterator = iter(population)
 
     toolbox = base.Toolbox()
+    logbook = tools.Logbook()
+    logbook.header = 'gen', 'evals', 'std', 'min', 'avg', 'max'
 
     _unregister(toolbox, 'individual')
     _unregister(toolbox, 'population')
     _unregister(toolbox, 'evaluate')
+    _unregister(toolbox, 'mate')
+    _unregister(toolbox, 'select')
 
     toolbox.register(
         'individual',
@@ -148,16 +177,35 @@ def find_xgboost_hyperparameters(
         ticker_val_df=ticker_val_df,
         val_pd_index=X_val.index,
         strategy_settings=strategy_settings,
+        xgboost_settings=xgboost_settings,
     )
+    toolbox.register('mate', _cxTwoPoint_dict, rng=rng)
+    toolbox.register('select', tools.selNSGA2)
 
-    params_pop = toolbox.population(n=hp_config['pop_size'])
+    pop_size = hp_config['pop_size']
+    cross_p = hp_config['crossover_prob']
+    mut_p = hp_config['mutation_prob']
 
-    for param_set in params_pop:
-        combined_params = xgboost_settings | param_set
-        xgboost = XGBClassifier(**combined_params)
-        fit_values = toolbox.evaluate(model=xgboost)
+    params_pop = toolbox.population(n=pop_size)
+    _evaluate_fitnesses(toolbox, params_pop)
 
-        print(f'acc={fit_values[0]}, sharpe={fit_values[1]}')
+    for gen in range(hp_config['generations']):
+        offsprings = [toolbox.clone(ind) for ind in params_pop]
+
+        for ind1, ind2 in zip(offsprings[::2], offsprings[1::2]):
+            if rng.random() <= cross_p:
+                toolbox.mate(ind1, ind2)
+
+            # toolbox.mutate(ind1)
+            # toolbox.mutate(ind2)
+            del ind1.fitness.values, ind2.fitness.values
+
+        _, invalid_ind = _evaluate_fitnesses(toolbox, offsprings)
+        params_pop = toolbox.select(params_pop + offsprings, k=pop_size)
+
+        # record = stats.compile(params_pop)
+        # logbook.record(gen=gen, evals=invalid_ind, **record)
+        # print(logbook.stream)
 
     return
 
@@ -169,7 +217,13 @@ def main():
     creator.create('xgboost_fitness', base.Fitness, weights=(1.0, 1.0))
     creator.create('Individual', dict, fitness=creator.xgboost_fitness)
 
-    tickers = config['tickers']
+    stats = tools.Statistics(lambda ind: ind.fitness.values)
+    stats.register('avg', np.mean)
+    stats.register('std', np.std)
+    stats.register('min', np.min)
+    stats.register('max', np.max)
+
+    tickers = config['tickers'][:1]
 
     def get_features(ticker, path):
         return pd.read_csv(f'{path}/{ticker}.csv', index_col=date_index_label)
@@ -214,6 +268,7 @@ def main():
                 transformer,
                 config['seed'],
                 config['modelling']['hp_search'],
+                stats,
             )
 
             # Path(f'{signal_path}/{system_type}').mkdir(exist_ok=True)
