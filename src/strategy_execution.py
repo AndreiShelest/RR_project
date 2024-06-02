@@ -28,12 +28,12 @@ def _validate_amount_of_trades(signal: pd.Series, trades_actual):
     )
 
 
-def _run_bh_strategy(test_df, initial_cash):
+def _run_bh_strategy(test_df, initial_cash, commission):
     backtest = Backtest(
         data=test_df,
         strategy=BuyAndHoldStrategy,
         cash=initial_cash,
-        commission=0,
+        commission=commission,
         trade_on_close=True,
     )
     results = backtest.run()
@@ -50,6 +50,7 @@ def main():
     basic_stats_path = config['data']['basic_stats_path']
     ts_stats_path = config['data']['time_series_stats_path']
     tickers = config['tickers']
+    commissions = config['strategy']['commissions']
     initial_cash = config['strategy']['initial_cash']
 
     basic_stats_data = {}
@@ -89,7 +90,9 @@ def main():
         test_df['High'] = test_df['Close']
         test_df['Low'] = test_df['Close']
 
-        bh_results = _run_bh_strategy(test_df, initial_cash)
+        commission = commissions[ticker]
+
+        bh_results = _run_bh_strategy(test_df, initial_cash, commission)
         assign_basic_stats(buy_hold_system, ticker, bh_results)
         assign_ts_stats(buy_hold_system, ticker, bh_results, initial_cash)
 
@@ -108,7 +111,7 @@ def main():
                 data=joined_df,
                 strategy=TradingStrategy,
                 cash=initial_cash,
-                commission=0,
+                commission=commission,
                 trade_on_close=True,
             )
             results = backtest.run()
