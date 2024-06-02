@@ -36,10 +36,10 @@ class Debug(BaseEstimator, TransformerMixin):
 
 class Wavelet(BaseEstimator, TransformerMixin):
 
-    def __init__(self, ticker, df_index, interim_path, mode, level, wavelet) -> None:
-        self.ticker = ticker
-        self.df_index = df_index
-        self.interim_path = interim_path
+    def __init__(self, mode, level, wavelet) -> None:
+        # self.ticker = ticker
+        # self.df_index = df_index
+        # self.interim_path = interim_path
         self.wavelet = wavelet
         self.mode = mode
         self.level = level
@@ -63,7 +63,11 @@ class Wavelet(BaseEstimator, TransformerMixin):
     
     def threshold_coefficients(self, coeffs):
         # applies thresholding optimisation
-        return denoise_wavelet(coeffs, method='BayesShrink', mode=self.mode, wavelet_levels=len(coeffs)-1, wavelet=coeffs[0].wavelet.name, rescale_sigma=True)
+        denoised_coeffs = [coeffs[0]]  # Keep approximation coefficients intact
+        denoised_coeffs += [
+            denoise_wavelet(c, method='BayesShrink', mode=self.mode, wavelet_levels=self.level, wavelet=self.wavelet, rescale_sigma=True)
+            for c in coeffs[1:]]
+        return denoised_coeffs
 
     def transform(self, X, y=None):
         # incremental denoising
@@ -112,7 +116,7 @@ def _generate_test_signal(
         system_type,
         normalizer=MinMaxScaler(),
         pca=PCA(**pca_settings),
-        dwt=Wavelet(**params),
+        dwt=Wavelet(**dwt_params),
         xgboost=XGBClassifier(**xgboost_settings, seed=seed),
     )
     model.fit(X_train, Y_train)
@@ -163,6 +167,7 @@ def perform_modelling(
                 test_df,
                 test_feat_df,
                 pca_settings,
+                dwt_params,
                 xgboost_settings,
                 seed,
             )
@@ -192,6 +197,7 @@ def main():
         target_feature_path,
         signal_path,
         pca_settings,
+        dwt_params,
         xgboost_settings,
         seed,
     )
