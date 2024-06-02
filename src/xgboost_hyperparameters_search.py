@@ -5,10 +5,10 @@ from xgboost import XGBClassifier
 from strategies import TradingStrategy
 from backtesting import Backtest
 from constants import signal_label, strategy_metrics, accuracy_label, sharpe_label
-from deap import base, tools
+from deap import base, tools, creator
 
 _learning_rate_label = 'learning_rate'
-_max_depth_label = ('max_depth',)
+_max_depth_label = 'max_depth'
 _min_child_weight = 'min_child_weight'
 _subsample = 'subsample'
 
@@ -70,7 +70,15 @@ def _generate_population(size, rng):
     gen_params = [
         _generate_parameters(param, size, rng) for param in _xgboost_hyperparams
     ]
-    return list(zip(*gen_params))
+    return [
+        {
+            _learning_rate_label: row[0],
+            _max_depth_label: row[1],
+            _min_child_weight: row[2],
+            _subsample: row[3],
+        }
+        for row in zip(*gen_params)
+    ]
 
 
 def find_xgboost_hyperparameters(
@@ -90,8 +98,21 @@ def find_xgboost_hyperparameters(
     rng = np.random.default_rng(seed=seed)
 
     population = _generate_population(_n_ind, rng)
+    population_iterator = iter(population)
+
+    creator.create('xgboost_fitness', base.Fitness, weights=(1.0, 1.0))
+    creator.create('Individual', dict, fitness=creator.xgboost_fitness)
 
     toolbox = base.Toolbox()
+
+    toolbox.register(
+        'individual',
+        tools.initIterate,
+        creator.Individual,
+        population_iterator.__next__,
+    )
+    toolbox.register('population', tools.initRepeat, list, toolbox.individual)
+
     toolbox.register(
         'evaluate',
         _xgboost_fitness,
@@ -100,8 +121,7 @@ def find_xgboost_hyperparameters(
         Y_val=Y_val,
         strategy_settings=strategy_settings,
     )
-    toolbox.register('population', tools.initIterate, list, lambda: iter(population))
 
-    pop = toolbox.population()
+    pop = toolbox.population(n=_n_ind)
 
     return
