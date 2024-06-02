@@ -238,6 +238,8 @@ def _generate_test_signal(
     system_type,
     X_train: pd.DataFrame,
     Y_train: pd.DataFrame,
+    X_val: pd.DataFrame,
+    Y_val: pd.DataFrame,
     X_test: pd.DataFrame,
     Y_test: pd.DataFrame,
     pca_settings,
@@ -252,7 +254,7 @@ def _generate_test_signal(
         dwt=Wavelet(**dwt_params),
         mooga = XGBoost_MOOGA(**optimisation_param),
     )
-    model.fit(X_train, Y_train)
+    model.fit(X_train, Y_train, X_val, Y_val)
 
     test_score = model.score(X_test, Y_test)
     print(f'System={system_type}, ticker={ticker}, test_score={test_score}')
@@ -266,6 +268,7 @@ def _generate_test_signal(
 def perform_modelling(
     tickers,
     tickers_train_path,
+    tickers_val_path,
     tickers_test_path,
     target_feature_path,
     signal_path,
@@ -283,6 +286,14 @@ def perform_modelling(
             f'{target_feature_path}/{ticker}.csv', index_col=date_index_label
         ).loc[train_df.index]
 
+        val_df = pd.read_csv(
+            f'{tickers_val_path}/{ticker}.csv', index_col=date_index_label
+        )
+        
+        val_feat_df = pd.read_csv(
+            f'{target_feature_path}/{ticker}.csv', index_col=date_index_label
+        ).loc[val_df.index]
+
         test_df = pd.read_csv(
             f'{tickers_test_path}/{ticker}.csv', index_col=date_index_label
         )
@@ -296,6 +307,8 @@ def perform_modelling(
                 system_type,
                 train_df,
                 train_feat_df,
+                val_df,
+                val_feat_df,
                 test_df,
                 test_feat_df,
                 pca_settings,
@@ -312,6 +325,7 @@ def main():
         config = json.load(config_file)
 
     tickers_train_path = config['data']['train_path']
+    tickers_val_path = config['data']['validation_path']
     tickers_test_path = config['data']['test_path']
     target_feature_path = config['data']['target_var_path']
     tickers = config['tickers']
@@ -324,6 +338,7 @@ def main():
     perform_modelling(
         tickers,
         tickers_train_path,
+        tickers_val_path,
         tickers_test_path,
         target_feature_path,
         signal_path,
