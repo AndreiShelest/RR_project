@@ -10,6 +10,7 @@ from constants import date_index_label, signal_label
 import pywt
 import numpy as np
 from skimage.restoration import denoise_wavelet
+from xgboost_hyperparameters_search import find_xgboost_hyperparameters
 
 
 class Debug(BaseEstimator, TransformerMixin):
@@ -113,13 +114,34 @@ def _generate_test_signal(
     system_type,
     X_train: pd.DataFrame,
     Y_train: pd.DataFrame,
+    X_val: pd.DataFrame,
+    Y_val: pd.DataFrame,
     X_test: pd.DataFrame,
     Y_test: pd.DataFrame,
     pca_settings,
     dwt_params,
     xgboost_settings,
+    strategy_settings,
     seed,
 ):
+    transformer = create_pipeline(
+        system_type,
+        normalizer=MinMaxScaler(),
+        pca=PCA(**pca_settings),
+        dwt=Wavelet(**dwt_params),
+    )
+    find_xgboost_hyperparameters(
+        ticker,
+        X_train,
+        Y_train,
+        X_val,
+        Y_val,
+        xgboost_settings,
+        strategy_settings,
+        transformer,
+        seed,
+    )
+
     model = create_pipeline(
         system_type,
         normalizer=MinMaxScaler(),
@@ -146,30 +168,34 @@ def _generate_test_signal(
 def perform_modelling(
     tickers,
     tickers_train_path,
+    tickers_validation_path,
     tickers_test_path,
     target_feature_path,
     signal_path,
     pca_settings,
     dwt_params,
     xgboost_settings,
+    strategy_settings,
     seed,
 ):
+    def get_features(ticker, path):
+        return pd.read_csv(f'{path}/{ticker}.csv', index_col=date_index_label)
+
+    def get_labels(ticker, feat_index):
+        return pd.read_csv(
+            f'{target_feature_path}/{ticker}.csv', index_col=date_index_label
+        ).loc[feat_index]
+
     for ticker in tickers:
-        train_df = pd.read_csv(
-            f'{tickers_train_path}/{ticker}.csv', index_col=date_index_label
-        )
+        train_df = get_features(ticker, tickers_train_path)
         train_df.dropna(inplace=True)
+        train_feat_df = get_labels(ticker, train_df.index)
 
-        train_feat_df = pd.read_csv(
-            f'{target_feature_path}/{ticker}.csv', index_col=date_index_label
-        ).loc[train_df.index]
+        valid_df = get_features(ticker, tickers_validation_path)
+        valid_feat_df = get_labels(ticker, valid_df.index)
 
-        test_df = pd.read_csv(
-            f'{tickers_test_path}/{ticker}.csv', index_col=date_index_label
-        )
-        test_feat_df = pd.read_csv(
-            f'{target_feature_path}/{ticker}.csv', index_col=date_index_label
-        ).loc[test_df.index]
+        test_df = get_features(ticker, tickers_test_path)
+        test_feat_df = get_labels(ticker, test_df.index)
 
         for system_type in system_types:
             signal_df = _generate_test_signal(
@@ -177,11 +203,14 @@ def perform_modelling(
                 system_type,
                 train_df,
                 train_feat_df,
+                valid_df,
+                valid_feat_df,
                 test_df,
                 test_feat_df,
                 pca_settings,
                 dwt_params,
                 xgboost_settings,
+                strategy_settings,
                 seed,
             )
 
@@ -194,6 +223,7 @@ def main():
         config = json.load(config_file)
 
     tickers_train_path = config['data']['train_path']
+    tickers_validation_path = config['data']['validation_path']
     tickers_test_path = config['data']['test_path']
     target_feature_path = config['data']['target_var_path']
     tickers = config['tickers']
@@ -201,17 +231,20 @@ def main():
     pca_settings = config['modelling']['pca']
     dwt_params = config['modelling']['dwt']
     xgboost_settings = config['modelling']['xgboost']
+    strategy_settings = config['strategy']
     seed = config['seed']
 
     perform_modelling(
         tickers,
         tickers_train_path,
+        tickers_validation_path,
         tickers_test_path,
         target_feature_path,
         signal_path,
         pca_settings,
         dwt_params,
         xgboost_settings,
+        strategy_settings,
         seed,
     )
 
