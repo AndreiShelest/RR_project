@@ -1,3 +1,19 @@
+# Project details
+Authors: Bracha Zofia, Shelest Andrei  
+University of Warsaw  
+
+Project is based on a paper found here: https://www.sciencedirect.com/science/article/abs/pii/S0957417419300995  
+title: "Combining Principal Component Analysis, Discrete Wavelet Transform  
+and XGBoost to trade in the financial markets"   
+Authors: João Nobre, Rui Ferreira Neves  
+
+Main parts include
+  1. PCA
+  2. Discrete Wavelet Transform
+  3. XGBoost with hyperparameter tunning using MOOGA.
+  4. Applying generated signals in trading
+  5. Evaluation
+
 # Setting Up the Environment
 
 The project was created in Python with Anaconda, therefore Anaconda is the preferred way to run the project.
@@ -17,3 +33,4 @@ There are several essential scripts to be run in order to download and prepare t
 - The actual modelling is performed in ```./src/modelling.py```.
 
 For each step configuration please refer to ```./project_config.json``` file, where you can see the paths where generated files are downloaded or stored, as well as configuration of algorithms.
+
