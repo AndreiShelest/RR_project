@@ -1,5 +1,6 @@
 # Project details
-Authors: Bracha Zofia, Shelest Andrei  
+Authors: Andrei Shelest, Zofia Bracha
+
 University of Warsaw  
 
 Project is based on a paper found here: https://www.sciencedirect.com/science/article/abs/pii/S0957417419300995  
@@ -31,6 +32,8 @@ There are several essential scripts to be run in order to download and prepare t
 - Then execute ```./src/features/technical_analysis.py``` in order to generate technical indicators.
 - After that, execute ```./src/models/train_test_split.py``` so that the appropriate split into train, validation and test datasets is created.
 - The actual modelling is performed in ```./src/modelling.py```.
+- Strategies are executed by ```./src/strategy_execution.py```.
+- And, finally, in the notebook ```1.0-strategy_performance.ipynb``` you can plot the performance of strategies.
 
 For each step configuration please refer to ```./project_config.json``` file, where you can see the paths where generated files are downloaded or stored, as well as configuration of algorithms.
 
