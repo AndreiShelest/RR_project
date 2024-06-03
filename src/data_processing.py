@@ -90,11 +90,6 @@ class Wavelet(BaseEstimator, TransformerMixin):
         return X_denoised
 
     
-    # def process_data_point(self, data, new_point):
-    #     extended_data = np.append(data, new_point)
-    #     coeffs = pywt.wavedec(extended_data, self.wavelet, level=self.level)
-    #     return coeffs
-    
     def reconstruct_signal(self, coeffs):
         return pywt.waverec(coeffs, self.wavelet)
 
