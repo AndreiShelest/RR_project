@@ -9,7 +9,6 @@ from system_types import create_pipeline, system_types
 from constants import date_index_label, signal_label
 import pywt
 import copy
-import random
 import numpy as np
 from skimage.restoration import denoise_wavelet
 import xgboost as xgb
@@ -31,10 +30,10 @@ class CustomPipeline(Pipeline):
         self.steps[-1][-1].fit(X, y, X_val=X_val, y_val=y_val)
         return self
 
-    def transform(self, X):
+    def predict(self, X):
         for name, transform in self.steps[:-1]:
             X = transform.transform(X)
-        return self.steps[-1][-1].transform(X)
+        return self.steps[-1][-1].predict(X)
     
 class CustomScaler(BaseEstimator, TransformerMixin):
     def __init__(self):
@@ -213,6 +212,9 @@ class XGBoost_MOOGA(BaseEstimator, TransformerMixin):
     def transform(self, X):
         return self.best_model_.predict(X)
     
+    def predict(self, X):
+        return self.transform(X)
+    
 class Wavelet(BaseEstimator, TransformerMixin):
 
     def __init__(self, mode, level, wavelet) -> None:
@@ -239,7 +241,7 @@ class Wavelet(BaseEstimator, TransformerMixin):
 
     def threshold_coefficients(self, coeffs):
         # applies thresholding optimisation
-        denoised_coeffs = [coeffs[0]]  # Keep approximation coefficients intact
+        denoised_coeffs = [coeffs[0]]  
         denoised_coeffs += [
             denoise_wavelet(
                 c,
@@ -306,7 +308,14 @@ def _generate_test_signal(
         ('mooga', XGBoost_MOOGA(**optimisation_param))]
     )
     model.fit(X_train, y=Y_train, X_val=X_val, y_val=Y_val)
+    print('cokolwiek')
+    X_train_transformed = model.transform(X_train)
+    print("Transformed Training Data Shape:", X_train_transformed.shape)
     signal = model.steps[-1][-1].predict(X_test)
+    # Output shapes for debugging
+    print("Transformed Test Shape:", X_test.shape)
+    print("Model Input Expectation:", model.steps[-1][-1].best_model_.feature_importances_.shape)
+
 
     signal_df = pd.DataFrame({signal_label: signal}, index=X_test.index)
     test_score = accuracy_score(Y_test, signal)  # Ensure the scoring method is used properly
