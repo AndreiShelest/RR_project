@@ -192,11 +192,11 @@ class XGBoost_MOOGA(BaseEstimator, TransformerMixin):
 
                 if no_improvement_generations == 4:
                     self.mutpb += self.hypermutation1
-                # elif no_improvement_generations == 6:
-                #     self.mutpb += self.hypermutation2
-                # elif no_improvement_generations == 8:
-                #     self.mutpb += self.hypermutation2
-                elif no_improvement_generations >= 5:
+                elif no_improvement_generations == 6:
+                    self.mutpb += self.hypermutation2
+                elif no_improvement_generations == 8:
+                    self.mutpb += self.hypermutation2
+                elif no_improvement_generations >= 10:
                     print("No improvement for 10 generations. Stopping early.")
                     break
 
@@ -317,8 +317,10 @@ def _generate_test_signal(
     model_opt = CustomPipeline(
         system_type,[
         ('normalizer', MinMaxScaler()),
-        ('mooga', XGBoost_MOOGA(**optimisation_param))]
-    )
+        ('pca', CustomPCA(**pca_settings)),
+        ('dwt', Wavelet(**dwt_params)),
+        ('mooga', XGBoost_MOOGA(**optimisation_param))])
+    
     model_opt.fit(X_train, y=Y_train, X_val=X_val, y_val=Y_val)
     print('Start')
     X_test_transformed = model_opt.transform(X_test)
@@ -372,8 +374,8 @@ def perform_modelling(
             f'{target_feature_path}/{ticker}.csv', index_col=date_index_label
         ).loc[test_df.index]
 
-        # for system_type in system_types
-        system_type = system_types[0]
+        
+        system_type = "with_pca_dwt_mooga"
         print(system_type)
         signal_df = _generate_test_signal(
                 ticker,

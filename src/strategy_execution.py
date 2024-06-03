@@ -14,6 +14,7 @@ from constants import (
     strategy_metrics_labels,
     return_label,
     bh_return_label,
+    with_pca_dwt_mooga_system
 )
 from strategies import TradingStrategy, BuyAndHoldStrategy
 
@@ -96,7 +97,10 @@ def main():
         assign_basic_stats(buy_hold_system, ticker, bh_results)
         assign_ts_stats(buy_hold_system, ticker, bh_results, initial_cash)
 
-        for system_type in system_types:
+        
+        system_types_full = system_types.append(with_pca_dwt_mooga_system)
+        
+        for system_type in system_types_full:
             signal_df = pd.read_csv(
                 f'{signal_path}/{system_type}/{ticker}.csv', index_col=date_index_label
             )

@@ -35,14 +35,20 @@
             "level": 5,
             "mode": "soft"
         },
+        "xgboost": {
+            "booster": "gbtree",
+            "n_estimators": 100,
+            "objective": "binary:logistic",
+            "eval_metric": "auc"
+        },
         "optimisation_param": {
             "n_individuals": 128,
-            "n_generations": 7 ,
+            "n_generations": 25 ,
             "cxpb": 0.5,
             "mutpb": 0.2,
             "hypermutation1": 0.1,
             "hypermutation2": 0.15,
-            "n_runs": 2
+            "n_runs": 5
         }
     },
     "strategy": {

@@ -5,11 +5,13 @@ buy_hold_system = 'b&h'
 without_pca_system = 'without_pca'
 with_pca_system = 'with_pca'
 with_pca_and_dwt_system = 'with_pca_and_dwt'
+with_pca_dwt_mooga_system = 'with_pca_dwt_mooga'
 system_titles = {
     buy_hold_system: 'Buy & Hold',
     without_pca_system: 'Basic',
     with_pca_system: 'PCA',
     with_pca_and_dwt_system: 'PCA & DWT',
+    with_pca_dwt_mooga_system: 'PCA & DWT & MOOGA'
 }
 
 equity_label = 'Equity'
