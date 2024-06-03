@@ -42,7 +42,8 @@
             "cxpb": 0.5,
             "mutpb": 0.2,
             "hypermutation1": 0.1,
-            "hypermutation2": 0.15
+            "hypermutation2": 0.15,
+            "n_runs": 10
         }
     },
     "strategy": {

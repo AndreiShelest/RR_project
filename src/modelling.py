@@ -38,7 +38,7 @@ class CustomPipeline(Pipeline):
     
 class CustomScaler(BaseEstimator, TransformerMixin):
     def __init__(self):
-        self.scaler = StandardScaler()
+        self.scaler = MinMaxScaler()
 
     def fit(self, X, y=None):
         self.scaler.fit(X)
@@ -89,35 +89,22 @@ def sharpe_ratio(returns):
     return mean_returns / std_returns if std_returns != 0 else 0
     
 class XGBoost_MOOGA(BaseEstimator, TransformerMixin):
-    def __init__(self, n_individuals, n_generations, cxpb, mutpb, hypermutation1, hypermutation2):
+    def __init__(self, n_individuals, n_generations, cxpb, mutpb, hypermutation1, hypermutation2, n_runs):
         self.n_individuals = n_individuals
         self.n_generations = n_generations
         self.cxpb = cxpb
         self.mutpb = mutpb
         self.hypermutation1 = hypermutation1
         self.hypermutation2 = hypermutation2
+        self.n_runs = n_runs
         self.best_params_ = None
         self.best_model_ = None
 
     def fit(self, X, y=None, X_val=None, y_val=None):
-        if isinstance(X, np.ndarray):
-            X_train = X.copy()
-        if isinstance(y, np.ndarray):
-            y_train = y.copy()
-        if isinstance(X_val, np.ndarray):
-            X_val = X_val.copy()
-        if isinstance(y_val, np.ndarray):
-            y_val = y_val.copy()
-        
-        # Initialize DEAP components
-        creator.create("FitnessMulti", base.Fitness, weights=(1.0, 1.0))  # maximize both objectives
-        creator.create("Individual", list, fitness=creator.FitnessMulti)
-
-        toolbox = base.Toolbox()
-        toolbox.register("attr_float", np.random.uniform, 0.01, 1.0)
-        toolbox.register("individual", tools.initCycle, creator.Individual,
-                         (toolbox.attr_float, toolbox.attr_float, toolbox.attr_float, toolbox.attr_float), n=1)
-        toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+        X_train = X if isinstance(X, np.ndarray) else X.values
+        y_train = y if isinstance(y, np.ndarray) else y.values
+        X_val = X_val if isinstance(X_val, np.ndarray) else X_val.values
+        y_val = y_val if isinstance(y_val, np.ndarray) else y_val.values
 
         def eval_individual(individual):
             params = {
@@ -130,81 +117,90 @@ class XGBoost_MOOGA(BaseEstimator, TransformerMixin):
                 objective='binary:logistic',
                 booster='gbtree',
                 n_estimators=100,
+                early_stopping_rounds=10,  # Moved to constructor
                 **params
             )
-            model.fit(X_train, y_train, eval_set=[(X_val, y_val)], early_stopping_rounds=10, verbose=False)
+            model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
             y_pred = model.predict(X_val)
             accuracy = accuracy_score(y_val, y_pred)
-            returns = y_pred - y_val  # Simplified return calculation, replace with actual trading returns
+            returns = y_pred - y_val  # Ensure both are NumPy arrays
             sharpe = sharpe_ratio(returns)
             return accuracy, sharpe
 
+        creator.create("FitnessMulti", base.Fitness, weights=(1.0, 1.0))  # maximize both objectives
+        creator.create("Individual", list, fitness=creator.FitnessMulti)
+
+        toolbox = base.Toolbox()
+        toolbox.register("attr_float", np.random.uniform, 0.01, 1.0)
+        toolbox.register("individual", tools.initCycle, creator.Individual,
+                         (toolbox.attr_float, toolbox.attr_float, toolbox.attr_float, toolbox.attr_float), n=1)
+        toolbox.register("population", tools.initRepeat, list, toolbox.individual)
         toolbox.register("evaluate", eval_individual)
         toolbox.register("mate", tools.cxTwoPoint)
         toolbox.register("mutate", tools.mutPolynomialBounded, low=0.01, up=1.0, eta=0.1, indpb=0.2)
         toolbox.register("select", tools.selNSGA2)
 
-        population = toolbox.population(n=self.n_individuals)
+        best_params_runs = []
+        best_scores = []
 
-        # Define the statistics and hall of fame
-        stats = tools.Statistics(lambda ind: ind.fitness.values)
-        stats.register("avg", np.mean, axis=0)
-        stats.register("std", np.std, axis=0)
-        stats.register("min", np.min, axis=0)
-        stats.register("max", np.max, axis=0)
+        for run in range(self.n_runs):
+            print(f"Run {run + 1}/{self.n_runs}")
+            population = toolbox.population(n=self.n_individuals)
 
-        hof = tools.HallOfFame(1)
+            stats = tools.Statistics(lambda ind: ind.fitness.values)
+            stats.register("avg", np.mean, axis=0)
+            stats.register("std", np.std, axis=0)
+            stats.register("min", np.min, axis=0)
+            stats.register("max", np.max, axis=0)
 
-        # Variables for early stopping
-        prev_best = None
-        no_improvement_generations = 0
+            hof = tools.HallOfFame(1)
 
-        # Evolutionary algorithm
-        for gen in range(self.n_generations):
-            offspring = algorithms.varAnd(population, toolbox, cxpb=self.cxpb, mutpb=self.mutpb)
-            fits = toolbox.map(toolbox.evaluate, offspring, [X_train]*len(offspring), [y_train]*len(offspring), [X_val]*len(offspring), [y_val]*len(offspring))
+            prev_best = None
+            no_improvement_generations = 0
 
-            # Update fitness values
-            for fit, ind in zip(fits, offspring):
-                ind.fitness.values = fit
+            for gen in range(self.n_generations):
+                offspring = algorithms.varAnd(population, toolbox, cxpb=self.cxpb, mutpb=self.mutpb)
+                fits = toolbox.map(toolbox.evaluate, offspring)
 
-            # Apply the selection process
-            population = toolbox.select(offspring, k=len(population))
-            record = stats.compile(population)
-            print(f"Generation {gen}: {record}")
+                for fit, ind in zip(fits, offspring):
+                    ind.fitness.values = fit
 
-            # Update hall of fame
-            hof.update(population)
+                population = toolbox.select(offspring, k=len(population))
+                record = stats.compile(population)
+                print(f"Generation {gen}: {record}")
 
-            # Early stopping logic
-            current_best = copy.deepcopy(hof.items[0])
-            if prev_best is None or current_best.fitness.values != prev_best.fitness.values:
-                no_improvement_generations = 0
-            else:
-                no_improvement_generations += 1
+                hof.update(population)
 
-            prev_best = copy.deepcopy(current_best)
+                current_best = copy.deepcopy(hof.items[0])
+                if prev_best is None or current_best.fitness.values != prev_best.fitness.values:
+                    no_improvement_generations = 0
+                else:
+                    no_improvement_generations += 1
 
-            # Hypermutation logic
-            if no_improvement_generations == 4:
-                self.mutpb += self.hypermutation1
-            elif no_improvement_generations == 6:
-                self.mutpb += self.hypermutation2
-            elif no_improvement_generations == 8:
-                self.mutpb += self.hypermutation2
-            elif no_improvement_generations >= 10:
-                print("No improvement for 10 generations. Stopping early.")
-                break
+                prev_best = copy.deepcopy(current_best)
 
-        # Extract the best parameters from the hall of fame
-        self.best_params_ = {
-            'learning_rate': hof[0][0],
-            'max_depth': int(hof[0][1] * 10),
-            'min_child_weight': hof[0][2] * 10,
-            'subsample': hof[0][3]
-        }
+                if no_improvement_generations == 4:
+                    self.mutpb += self.hypermutation1
+                elif no_improvement_generations == 6:
+                    self.mutpb += self.hypermutation2
+                elif no_improvement_generations == 8:
+                    self.mutpb += self.hypermutation2
+                elif no_improvement_generations >= 10:
+                    print("No improvement for 10 generations. Stopping early.")
+                    break
 
-        # Train the final model with the best parameters on the entire dataset
+            best_params_runs.append({
+                'learning_rate': hof[0][0],
+                'max_depth': int(hof[0][1] * 10),
+                'min_child_weight': hof[0][2] * 10,
+                'subsample': hof[0][3]
+            })
+            best_scores.append(hof[0].fitness.values)
+
+        # Select the best overall parameters based on the average performance
+        best_run_idx = np.argmax([np.mean(score) for score in best_scores])
+        self.best_params_ = best_params_runs[best_run_idx]
+
         self.best_model_ = xgb.XGBClassifier(
             objective='binary:logistic',
             booster='gbtree',
@@ -294,6 +290,7 @@ def _generate_test_signal(
     optimisation_param,
 
 ):
+    
     model = CustomPipeline(
         system_type,[
         ('normalizer', MinMaxScaler()),
@@ -303,12 +300,11 @@ def _generate_test_signal(
     )
     model.fit(X_train, y=Y_train, X_val=X_val, y_val=Y_val)
     signal = model.steps[-1][-1].predict(X_test)
-    print(f'System={system_type}, ticker={ticker}, test_score={test_score}')
-
-    signal = model.steps[-1][-1].predict(X_test)
 
     signal_df = pd.DataFrame({signal_label: signal}, index=X_test.index)
-    test_score = model.steps[-1][-1].score(X_test, Y_test)
+    test_score = accuracy_score(Y_test, signal)  # Ensure the scoring method is used properly
+    print(f'System={system_type}, ticker={ticker}, test_score={test_score}')
+
     return signal_df
 
 
@@ -332,6 +328,7 @@ def perform_modelling(
         train_feat_df = pd.read_csv(
             f'{target_feature_path}/{ticker}.csv', index_col=date_index_label
         ).loc[train_df.index]
+        
 
         val_df = pd.read_csv(
             f'{tickers_val_path}/{ticker}.csv', index_col=date_index_label
