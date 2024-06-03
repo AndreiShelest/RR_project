@@ -301,7 +301,7 @@ def _generate_test_signal(
         ('dwt', Wavelet(**dwt_params)),
         ('mooga', XGBoost_MOOGA(**optimisation_param))]
     )
-    model.fit(X_train, Y_train, X_val=X_val, y_val=Y_val)
+    model.fit(X_train, y=Y_train, X_val=X_val, y_val=Y_val)
     signal = model.steps[-1][-1].predict(X_test)
     print(f'System={system_type}, ticker={ticker}, test_score={test_score}')
 
