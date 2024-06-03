@@ -180,11 +180,11 @@ class XGBoost_MOOGA(BaseEstimator, TransformerMixin):
 
                 if no_improvement_generations == 4:
                     self.mutpb += self.hypermutation1
-                elif no_improvement_generations == 6:
-                    self.mutpb += self.hypermutation2
-                elif no_improvement_generations == 8:
-                    self.mutpb += self.hypermutation2
-                elif no_improvement_generations >= 10:
+                # elif no_improvement_generations == 6:
+                #     self.mutpb += self.hypermutation2
+                # elif no_improvement_generations == 8:
+                #     self.mutpb += self.hypermutation2
+                elif no_improvement_generations >= 5:
                     print("No improvement for 10 generations. Stopping early.")
                     break
 
