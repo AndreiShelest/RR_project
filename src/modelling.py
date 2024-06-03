@@ -124,13 +124,13 @@ def _generate_test_signal(
     xgboost,
     seed,
 ):  
-    param_search = {
-            "max_depth": randint(3, 15),
-            "learning_rate": uniform(0.01, 0.3),
-            "min_child_weight": randint(1, 15),
-            "subsample": uniform(0.5, 0.9),
-            "early_stopping_rounds": [10]
-        }
+    # param_search = {
+    #         "max_depth": randint(3, 15),
+    #         "learning_rate": uniform(0.01, 0.3),
+    #         "min_child_weight": randint(1, 15),
+    #         "subsample": uniform(0.5, 0.9),
+    #         "early_stopping_rounds": [10]
+    #     }
     model = create_pipeline(
         system_type,
         normalizer=MinMaxScaler(),
@@ -138,10 +138,10 @@ def _generate_test_signal(
         dwt=Wavelet(**dwt_params),
         xgboost=XGBClassifier(**xgboost, random_state=seed),
     )
-    random_search = GridSearchCV(model, param_distributions=param_search, n_iter=50, cv=5, n_jobs=-1, scoring='accuracy', random_state=seed)
-    random_search.fit(X_train, Y_train)
+    # random_search = GridSearchCV(model, param_distributions=param_search, n_iter=50, cv=5, n_jobs=-1, scoring='accuracy', random_state=seed)
+    # random_search.fit(X_train, Y_train)
 
-    y_pred = random_search.predict(X_val)
+    model.fit(X_train, Y_train)
 
     test_score = model.score(X_test, Y_test)
     print(f'System={system_type}, ticker={ticker}, test_score={test_score}')
