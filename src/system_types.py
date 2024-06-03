@@ -7,29 +7,29 @@ system_types = [without_pca_system, with_pca_system, with_pca_and_dwt_system]
 def create_pipeline(system_type, **kwargs):
     if system_type == without_pca_system:
         normalizer = kwargs['normalizer']
-        mooga = kwargs['mooga']
+        xgboost = kwargs['xgboost']
 
-        return Pipeline([('normalizer', normalizer), ('mooga', mooga)])
+        return Pipeline([('normalizer', normalizer), ('xgboost', xgboost)])
     if system_type == with_pca_system:
         normalizer = kwargs['normalizer']
         pca = kwargs['pca']
-        mooga = kwargs['mooga']
+        xgboost = kwargs['xgboost']
 
         return Pipeline(
             [
                 ('normalizer', normalizer),
                 ('pca', pca),
-                ('mooga', mooga),
+                ('xgboost', xgboost),
             ]
         )
     if system_type == with_pca_and_dwt_system:
         normalizer = kwargs['normalizer']
         pca = kwargs['pca']
         dwt = kwargs['dwt']
-        mooga = kwargs['mooga']
+        xgboost = kwargs['xgboost']
 
         return Pipeline(
-            [('normalizer', normalizer), ('pca', pca), ('dwt', dwt), ('mooga', mooga)]
+            [('normalizer', normalizer), ('pca', pca), ('dwt', dwt), ('xgboost', xgboost)]
         )
 
     raise 'Incorrect system type.'

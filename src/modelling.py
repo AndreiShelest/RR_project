@@ -125,10 +125,10 @@ def _generate_test_signal(
     seed,
 ):  
     param_search = {
-            "max_depth": randint(3, 10),
+            "max_depth": randint(3, 15),
             "learning_rate": uniform(0.01, 0.3),
-            "min_child_weight": [],
-            "subsample": [0.9],
+            "min_child_weight": randint(1, 15),
+            "subsample": uniform(0.5, 0.9),
             "early_stopping_rounds": [10]
         }
     model = create_pipeline(
@@ -136,16 +136,12 @@ def _generate_test_signal(
         normalizer=MinMaxScaler(),
         pca=PCA(**pca_settings),
         dwt=Wavelet(**dwt_params),
-        xgboost=XGBClassifier(**xgboost, seed=seed),
+        xgboost=XGBClassifier(**xgboost, random_state=seed),
     )
+    random_search = GridSearchCV(model, param_distributions=param_search, n_iter=50, cv=5, n_jobs=-1, scoring='accuracy', random_state=seed)
+    random_search.fit(X_train, Y_train)
 
-    grid_search = GridSearchCV(pipeline, param_search, cv=5, n_jobs=-1, scoring='accuracy')
-    model.fit(X_train, Y_train)
-
-    if model.named_steps.get('pca') is not None:
-        print(
-            f'System={system_type}, ticker={ticker}, PCA components={model["pca"].n_components_}'
-        )
+    y_pred = random_search.predict(X_val)
 
     test_score = model.score(X_test, Y_test)
     print(f'System={system_type}, ticker={ticker}, test_score={test_score}')
@@ -159,6 +155,7 @@ def _generate_test_signal(
 def perform_modelling(
     tickers,
     tickers_train_path,
+    tickers_val_path,
     tickers_test_path,
     target_feature_path,
     signal_path,
@@ -177,6 +174,14 @@ def perform_modelling(
             f'{target_feature_path}/{ticker}.csv', index_col=date_index_label
         ).loc[train_df.index]
 
+        val_df = pd.read_csv(
+            f'{tickers_val_path}/{ticker}.csv', index_col=date_index_label
+        )
+        
+        val_feat_df = pd.read_csv(
+            f'{target_feature_path}/{ticker}.csv', index_col=date_index_label
+        ).loc[val_df.index]
+
         test_df = pd.read_csv(
             f'{tickers_test_path}/{ticker}.csv', index_col=date_index_label
         )
@@ -190,11 +195,13 @@ def perform_modelling(
                 system_type,
                 train_df,
                 train_feat_df,
+                val_df,
+                val_feat_df,
                 test_df,
                 test_feat_df,
                 pca_settings,
                 dwt_params,
-                xgboost_settings,
+                xgboost,
                 seed,
             )
 
@@ -208,23 +215,25 @@ def main():
 
     tickers_train_path = config['data']['train_path']
     tickers_test_path = config['data']['test_path']
+    tickers_val_path = config['data']['validation_path']
     target_feature_path = config['data']['target_var_path']
     tickers = config['tickers']
     signal_path = config['data']['signal_path']
     pca_settings = config['modelling']['pca']
     dwt_params = config['modelling']['dwt']
-    xgboost_settings = config['modelling']['xgboost']
+    xgboost = config['modelling']['xgboost']
     seed = config['seed']
 
     perform_modelling(
         tickers,
         tickers_train_path,
+        tickers_val_path,
         tickers_test_path,
         target_feature_path,
         signal_path,
         pca_settings,
         dwt_params,
-        xgboost_settings,
+        xgboost,
         seed,
     )
 
