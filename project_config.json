@@ -19,8 +19,7 @@
         "signal_path": "./strategies_data/signals",
         "basic_stats_path": "./strategies_data/performance/basic_stats",
         "time_series_stats_path": "./strategies_data/performance/time_series_stats",
-        "over_time_stats_path": "./strategies_data/performance/over_time_stats",
-        "models_path": "./models"
+        "over_time_stats_path": "./strategies_data/performance/over_time_stats"
     },
     "modelling": {
         "split": {
@@ -29,7 +28,7 @@
             "gap": 100
         },
         "pca": {
-            "n_components": 6
+            "n_components": 0.95
         },
         "dwt": {
             "wavelet": "haar",
@@ -47,7 +46,14 @@
         }
     },
     "strategy": {
-        "initial_cash": 100000
+        "initial_cash": 100000,
+        "commissions": {
+            "XOM": 0.001,
+            "HD": 0.001,
+            "^SPX": 0.001,
+            "BZ=F": 0.001,
+            "ZC=F": 0.001
+        }
     },
     "seed": 12345
 }

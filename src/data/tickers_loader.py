@@ -1,6 +1,8 @@
 import yfinance as yf
 from datetime import datetime, timedelta
 import json
+import pandas as pd
+import numpy as np
 
 
 def _load_ticker_history(ticker: yf.Ticker, start_date, end_date):
@@ -29,12 +31,46 @@ def _download_historical_data(
     return histories
 
 
+def _recalculate_adj_close(ticker, history: pd.DataFrame):
+    if history['Stock Splits'].sum() > 0:
+        raise f'{ticker} Stock Split!'
+
+    iter_history = history.reset_index()
+
+    div_mults = []
+
+    div_payments = iter_history.loc[iter_history['Dividends'] > 0].shape[0]
+
+    for idx, row in iter_history.iterrows():
+        if idx == len(iter_history) - 1:
+            div_mults.append(1)
+            continue
+
+        next_row = iter_history.iloc[idx + 1]
+        div_mult = 1 - next_row['Dividends'] / row['Close']
+        div_mults.append(div_mult)
+
+    div_mults = np.array(div_mults)
+
+    div_mult_count = div_mults[div_mults < 1].shape[0]
+    print(
+        f'Recalculating Adj Close: ticker={ticker}, div_payments_count={div_payments}, div_mult_count={div_mult_count}, valid={div_payments == div_mult_count}'
+    )
+
+    adj_coeff = div_mults[::-1].cumprod()[::-1]
+    history['Adj Close'] = history['Close'] * adj_coeff
+
+    return history
+
+
 def load_and_store(
     tickers: list[str], start_date: datetime, end_date: datetime, folder_path: str
 ):
     histories = _download_historical_data(tickers, start_date, end_date)
 
     for ticker, history, _ in histories:
+        _recalculate_adj_close(ticker, history)
+
         history.to_csv(f'{folder_path}/{ticker}.csv', date_format='%Y-%m-%d')
 
         print(f'Ticker info {ticker} is loaded and stored.')

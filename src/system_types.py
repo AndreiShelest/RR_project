@@ -1,7 +1,7 @@
 from sklearn.pipeline import Pipeline
-from constants import without_pca_system, with_pca_and_dwt_system
+from constants import without_pca_system, with_pca_system, with_pca_and_dwt_system
 
-system_types = [without_pca_system, with_pca_and_dwt_system]
+system_types = [without_pca_system, with_pca_system, with_pca_and_dwt_system]
 
 
 def create_pipeline(system_type, **kwargs):
@@ -10,6 +10,18 @@ def create_pipeline(system_type, **kwargs):
         mooga = kwargs['mooga']
 
         return Pipeline([('normalizer', normalizer), ('mooga', mooga)])
+    if system_type == with_pca_system:
+        normalizer = kwargs['normalizer']
+        pca = kwargs['pca']
+        mooga = kwargs['mooga']
+
+        return Pipeline(
+            [
+                ('normalizer', normalizer),
+                ('pca', pca),
+                ('mooga', mooga),
+            ]
+        )
     if system_type == with_pca_and_dwt_system:
         normalizer = kwargs['normalizer']
         pca = kwargs['pca']

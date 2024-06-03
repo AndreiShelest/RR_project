@@ -57,7 +57,10 @@ def _perform_technical_analysis(ticker_df: pd.DataFrame):
 
 
 def _prepare_ticker_df(ticker_df: pd.DataFrame):
-    ticker_df.drop(columns=['Close', 'Dividends', 'Stock Splits'], inplace=True)
+    required_cols = {'Open', 'High', 'Low', 'Adj Close', 'Volume'}
+    cols_to_remove = list(filter(lambda c: c not in required_cols, ticker_df.columns.values))
+    
+    ticker_df.drop(columns=cols_to_remove, inplace=True)
 
     ticker_df.rename(
         columns={
