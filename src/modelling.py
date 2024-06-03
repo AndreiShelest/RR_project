@@ -18,6 +18,47 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.preprocessing import StandardScaler
 
+class CustomPipeline(Pipeline):
+    def __init__(self, system_type, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.system_type = system_type
+
+    def fit(self, X, y=None, X_val=None, y_val=None):
+        for name, transform in self.steps[:-1]:
+            X = transform.fit_transform(X, y)
+            if X_val is not None:
+                X_val = transform.transform(X_val)
+        self.steps[-1][-1].fit(X, y, X_val=X_val, y_val=y_val)
+        return self
+
+    def transform(self, X):
+        for name, transform in self.steps[:-1]:
+            X = transform.transform(X)
+        return self.steps[-1][-1].transform(X)
+    
+class CustomScaler(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        self.scaler = StandardScaler()
+
+    def fit(self, X, y=None):
+        self.scaler.fit(X)
+        return self
+
+    def transform(self, X):
+        return self.scaler.transform(X)
+
+class CustomPCA(BaseEstimator, TransformerMixin):
+    def __init__(self, n_components):
+        self.n_components = n_components
+        self.pca = PCA(n_components=n_components)
+
+    def fit(self, X, y=None):
+        self.pca.fit(X)
+        return self
+
+    def transform(self, X):
+        return self.pca.transform(X)
+
 
 class Debug(BaseEstimator, TransformerMixin):
 
@@ -59,6 +100,15 @@ class XGBoost_MOOGA(BaseEstimator, TransformerMixin):
         self.best_model_ = None
 
     def fit(self, X, y=None, X_val=None, y_val=None):
+        if isinstance(X, np.ndarray):
+            X_train = X.copy()
+        if isinstance(y, np.ndarray):
+            y_train = y.copy()
+        if isinstance(X_val, np.ndarray):
+            X_val = X_val.copy()
+        if isinstance(y_val, np.ndarray):
+            y_val = y_val.copy()
+        
         # Initialize DEAP components
         creator.create("FitnessMulti", base.Fitness, weights=(1.0, 1.0))  # maximize both objectives
         creator.create("Individual", list, fitness=creator.FitnessMulti)
@@ -82,7 +132,7 @@ class XGBoost_MOOGA(BaseEstimator, TransformerMixin):
                 n_estimators=100,
                 **params
             )
-            model.fit(X, y)
+            model.fit(X_train, y_train, eval_set=[(X_val, y_val)], early_stopping_rounds=10, verbose=False)
             y_pred = model.predict(X_val)
             accuracy = accuracy_score(y_val, y_pred)
             returns = y_pred - y_val  # Simplified return calculation, replace with actual trading returns
@@ -112,7 +162,7 @@ class XGBoost_MOOGA(BaseEstimator, TransformerMixin):
         # Evolutionary algorithm
         for gen in range(self.n_generations):
             offspring = algorithms.varAnd(population, toolbox, cxpb=self.cxpb, mutpb=self.mutpb)
-            fits = toolbox.map(toolbox.evaluate, offspring)
+            fits = toolbox.map(toolbox.evaluate, offspring, [X_train]*len(offspring), [y_train]*len(offspring), [X_val]*len(offspring), [y_val]*len(offspring))
 
             # Update fitness values
             for fit, ind in zip(fits, offspring):
@@ -170,9 +220,6 @@ class XGBoost_MOOGA(BaseEstimator, TransformerMixin):
 class Wavelet(BaseEstimator, TransformerMixin):
 
     def __init__(self, mode, level, wavelet) -> None:
-        # self.ticker = ticker
-        # self.df_index = df_index
-        # self.interim_path = interim_path
         self.wavelet = wavelet
         self.mode = mode
         self.level = level
@@ -247,21 +294,21 @@ def _generate_test_signal(
     optimisation_param,
 
 ):
-    model = create_pipeline(
-        system_type,
-        normalizer=MinMaxScaler(),
-        pca=PCA(**pca_settings),
-        dwt=Wavelet(**dwt_params),
-        mooga = XGBoost_MOOGA(**optimisation_param),
+    model = CustomPipeline(
+        system_type,[
+        ('normalizer', MinMaxScaler()),
+        ('pca', PCA(**pca_settings)),
+        ('dwt', Wavelet(**dwt_params)),
+        ('mooga', XGBoost_MOOGA(**optimisation_param))]
     )
-    model.fit(X_train, Y_train, X_val, Y_val)
-
-    test_score = model.score(X_test, Y_test)
+    model.fit(X_train, Y_train, X_val=X_val, y_val=Y_val)
+    signal = model.steps[-1][-1].predict(X_test)
     print(f'System={system_type}, ticker={ticker}, test_score={test_score}')
 
-    signal = model.predict(X_test)
+    signal = model.steps[-1][-1].predict(X_test)
 
     signal_df = pd.DataFrame({signal_label: signal}, index=X_test.index)
+    test_score = model.steps[-1][-1].score(X_test, Y_test)
     return signal_df
 
 
