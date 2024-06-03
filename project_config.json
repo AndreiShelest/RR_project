@@ -37,7 +37,7 @@
         },
         "optimisation_param": {
             "n_individuals": 128,
-            "n_generations": 15 ,
+            "n_generations": 7 ,
             "cxpb": 0.5,
             "mutpb": 0.2,
             "hypermutation1": 0.1,

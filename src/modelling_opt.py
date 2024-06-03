@@ -23,16 +23,24 @@ class CustomPipeline(Pipeline):
         self.system_type = system_type
 
     def fit(self, X, y=None, X_val=None, y_val=None):
+        print("Initial Train Shape:", X.shape)
         for name, transform in self.steps[:-1]:
             X = transform.fit_transform(X, y)
+            print(f"{name} Transformed Train Shape:", X.shape)
             if X_val is not None:
+                print(f"Initial Validation Shape before {name}:", X_val.shape)
                 X_val = transform.transform(X_val)
+                print(f"{name} Transformed Validation Shape:", X_val.shape)
+        print("Shape before final model fitting:", X.shape)
         self.steps[-1][-1].fit(X, y, X_val=X_val, y_val=y_val)
         return self
 
     def predict(self, X):
+        print("Initial Predict Shape:", X.shape)
         for name, transform in self.steps[:-1]:
             X = transform.transform(X)
+            print(f"{name} Transformed Predict Shape:", X.shape)
+        print("Shape before final model prediction:", X.shape)
         return self.steps[-1][-1].predict(X)
     
 class CustomScaler(BaseEstimator, TransformerMixin):
@@ -56,9 +64,12 @@ class CustomPCA(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X):
-        return self.pca.transform(X)
+        transformed_data = self.pca.transform(X)
+        print("PCA Transformed Data Shape:", transformed_data.shape)
+        return transformed_data
 
-
+'''
+CURRENTLY NOT IN USE
 class Debug(BaseEstimator, TransformerMixin):
 
     def __init__(self, ticker, df_index, interim_path) -> None:
@@ -80,6 +91,7 @@ class Debug(BaseEstimator, TransformerMixin):
 
         transformed_df.to_csv(f'{self.interim_path}/{self.ticker}.csv')
         return self
+'''
     
 def sharpe_ratio(returns):
     # sharpe ratio
@@ -116,13 +128,13 @@ class XGBoost_MOOGA(BaseEstimator, TransformerMixin):
                 objective='binary:logistic',
                 booster='gbtree',
                 n_estimators=100,
-                early_stopping_rounds=10,  # Moved to constructor
+                early_stopping_rounds=10, 
                 **params
             )
             model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
             y_pred = model.predict(X_val)
             accuracy = accuracy_score(y_val, y_pred)
-            returns = y_pred - y_val  # Ensure both are NumPy arrays
+            returns = y_pred - y_val  
             sharpe = sharpe_ratio(returns)
             return accuracy, sharpe
 
@@ -210,10 +222,10 @@ class XGBoost_MOOGA(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X):
-        return self.best_model_.predict(X)
+        return X
     
     def predict(self, X):
-        return self.transform(X)
+        return self.best_model_.predict(X)
     
 class Wavelet(BaseEstimator, TransformerMixin):
 
@@ -267,7 +279,7 @@ class Wavelet(BaseEstimator, TransformerMixin):
             extended_data = np.concatenate([train_feature_data, feature_data])
 
             for i in range(n_samples):
-                data_point = extended_data[len(train_feature_data) + i]
+                # data_point = extended_data[len(train_feature_data) + i]
                 data_up_to_point = extended_data[: len(train_feature_data) + i + 1]
 
                 coeffs = pywt.wavedec(data_up_to_point, self.wavelet, level=self.level)
@@ -278,6 +290,8 @@ class Wavelet(BaseEstimator, TransformerMixin):
                 denoised_feature_data[i] = denoised_point
 
             X_denoised[:, feature_idx] = denoised_feature_data
+
+        print("Wavelet Transformed Data Shape:", X_denoised.shape)
 
         return X_denoised
 
@@ -300,21 +314,18 @@ def _generate_test_signal(
 
 ):
     
-    model = CustomPipeline(
+    model_opt = CustomPipeline(
         system_type,[
         ('normalizer', MinMaxScaler()),
-        ('pca', PCA(**pca_settings)),
-        ('dwt', Wavelet(**dwt_params)),
         ('mooga', XGBoost_MOOGA(**optimisation_param))]
     )
-    model.fit(X_train, y=Y_train, X_val=X_val, y_val=Y_val)
-    print('cokolwiek')
-    X_train_transformed = model.transform(X_train)
-    print("Transformed Training Data Shape:", X_train_transformed.shape)
-    signal = model.steps[-1][-1].predict(X_test)
-    # Output shapes for debugging
-    print("Transformed Test Shape:", X_test.shape)
-    print("Model Input Expectation:", model.steps[-1][-1].best_model_.feature_importances_.shape)
+    model_opt.fit(X_train, y=Y_train, X_val=X_val, y_val=Y_val)
+    print('Start')
+    X_test_transformed = model_opt.transform(X_test)
+    print("Transformed test Data Shape:", X_test_transformed.shape)
+    signal = model_opt.steps[-1][-1].predict(X_test_transformed)
+    # print("Transformed Test Shape:", X_test.shape)
+    print("Model Input Expectation:", model_opt.steps[-1][-1].best_model_.feature_importances_.shape)
 
 
     signal_df = pd.DataFrame({signal_label: signal}, index=X_test.index)
@@ -361,8 +372,10 @@ def perform_modelling(
             f'{target_feature_path}/{ticker}.csv', index_col=date_index_label
         ).loc[test_df.index]
 
-        for system_type in system_types:
-            signal_df = _generate_test_signal(
+        # for system_type in system_types
+        system_type = system_types[0]
+        print(system_type)
+        signal_df = _generate_test_signal(
                 ticker,
                 system_type,
                 train_df,
@@ -376,8 +389,8 @@ def perform_modelling(
                 optimisation_param
             )
 
-            Path(f'{signal_path}/{system_type}').mkdir(exist_ok=True)
-            signal_df.to_csv(f'{signal_path}/{system_type}/{ticker}.csv')
+        Path(f'{signal_path}/{system_type}').mkdir(exist_ok=True)
+        signal_df.to_csv(f'{signal_path}/{system_type}/{ticker}.csv')
 
 
 def main():
