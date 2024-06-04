@@ -1,6 +1,7 @@
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.decomposition import PCA
 import pandas as pd
+from sklearn.pipeline import Pipeline
 import json
 from xgboost import XGBClassifier
 from sklearn.base import TransformerMixin, BaseEstimator
@@ -9,38 +10,20 @@ from system_types import create_pipeline, system_types
 from constants import date_index_label, signal_label
 import pywt
 import numpy as np
+from sklearn.metrics import accuracy_score
 from skimage.restoration import denoise_wavelet
+from scipy.stats import uniform, randint
+from sklearn.model_selection import ParameterSampler
 
-
-class Debug(BaseEstimator, TransformerMixin):
-
-    def __init__(self, ticker, df_index, interim_path) -> None:
-        super().__init__()
-        self.ticker = ticker
-        self.df_index = df_index
-        self.interim_path = interim_path
-
-    def transform(self, X):
-        return X
-
-    def fit(self, X, y=None, **fit_params):
-        transformed_df = pd.DataFrame(
-            data=X,
-            columns=[f'C{idx}' for idx, _ in enumerate(X[0])],
-        )
-        transformed_df.insert(0, self.df_index.name, self.df_index)
-        transformed_df.set_index(self.df_index.name, inplace=True)
-
-        transformed_df.to_csv(f'{self.interim_path}/{self.ticker}.csv')
-        return self
+without_pca_system = "without_pca"
+with_pca_system = "with_pca"
+with_pca_and_dwt_system = "with_pca_and_dwt"
+system_types = [without_pca_system, with_pca_system, with_pca_and_dwt_system]
 
 
 class Wavelet(BaseEstimator, TransformerMixin):
 
     def __init__(self, mode, level, wavelet) -> None:
-        # self.ticker = ticker
-        # self.df_index = df_index
-        # self.interim_path = interim_path
         self.wavelet = wavelet
         self.mode = mode
         self.level = level
@@ -64,7 +47,7 @@ class Wavelet(BaseEstimator, TransformerMixin):
 
     def threshold_coefficients(self, coeffs):
         # applies thresholding optimisation
-        denoised_coeffs = [coeffs[0]]  # Keep approximation coefficients intact
+        denoised_coeffs = [coeffs[0]]  
         denoised_coeffs += [
             denoise_wavelet(
                 c,
@@ -90,7 +73,7 @@ class Wavelet(BaseEstimator, TransformerMixin):
             extended_data = np.concatenate([train_feature_data, feature_data])
 
             for i in range(n_samples):
-                data_point = extended_data[len(train_feature_data) + i]
+                # data_point = extended_data[len(train_feature_data) + i]
                 data_up_to_point = extended_data[: len(train_feature_data) + i + 1]
 
                 coeffs = pywt.wavedec(data_up_to_point, self.wavelet, level=self.level)
@@ -102,42 +85,125 @@ class Wavelet(BaseEstimator, TransformerMixin):
 
             X_denoised[:, feature_idx] = denoised_feature_data
 
+        print("Wavelet Transformed Data Shape:", X_denoised.shape)
+
         return X_denoised
 
     def reconstruct_signal(self, coeffs):
         return pywt.waverec(coeffs, self.wavelet)
 
 
+'''
+def create_pipeline(system_type, **kwargs):
+    if system_type == without_pca_system:
+        normalizer = kwargs['normalizer']
+        xgboost = kwargs['xgboost']
+        steps = [('normalizer', normalizer), ('xgboost', xgboost)]
+    
+    if system_type == with_pca_system:
+        normalizer = kwargs['normalizer']
+        pca = kwargs['pca']
+        xgboost = kwargs['xgboost']
+        steps = [('normalizer', normalizer), ('pca', pca), ('xgboost', xgboost)]
+    
+    if system_type == with_pca_and_dwt_system:
+        normalizer = kwargs['normalizer']
+        pca = kwargs['pca']
+        dwt = kwargs['dwt']
+        xgboost = kwargs['xgboost']
+        steps = [('normalizer', normalizer), ('pca', pca), ('dwt', dwt), ('xgboost', xgboost)]
+    
+    else:
+        raise ValueError('Incorrect system type.')
+
+    # Print the steps being applied in the pipeline
+    print(f"Pipeline steps for {system_type}: {[step[0] for step in steps]}")
+    return Pipeline(steps)
+'''
+
 def _generate_test_signal(
     ticker,
     system_type,
     X_train: pd.DataFrame,
     Y_train: pd.DataFrame,
+    X_val: pd.DataFrame,
+    Y_val: pd.DataFrame,
     X_test: pd.DataFrame,
     Y_test: pd.DataFrame,
     pca_settings,
     dwt_params,
-    xgboost_settings,
+    xgboost,
     seed,
-):
-    model = create_pipeline(
-        system_type,
-        normalizer=MinMaxScaler(),
-        pca=PCA(**pca_settings),
-        dwt=Wavelet(**dwt_params),
-        xgboost=XGBClassifier(**xgboost_settings, seed=seed),
-    )
-    model.fit(X_train, Y_train)
+):  
+    param_search = {
+        "max_depth": randint(3, 15),
+        "learning_rate": uniform(0.01, 0.3),
+        "min_child_weight": randint(1, 15),
+        "subsample": uniform(0.5, 0.5)  # Corrected range to [0.5, 1.0)
+    }
+    
+    n_iter_search = 50
+    param_list = list(ParameterSampler(param_search, n_iter_search, random_state=seed))
 
-    if model.named_steps.get('pca') is not None:
-        print(
-            f'System={system_type}, ticker={ticker}, PCA components={model["pca"].n_components_}'
-        )
+    ### Preprocessor Pipeline Creation ###
+    if system_type == with_pca_and_dwt_system:
+        preprocessor = Pipeline([
+            ('normalizer', MinMaxScaler()),
+            ('pca', PCA(**pca_settings)),
+            ('dwt', Wavelet(**dwt_params))
+        ])
+    elif system_type == with_pca_system:
+        preprocessor = Pipeline([
+            ('normalizer', MinMaxScaler()),
+            ('pca', PCA(**pca_settings))
+        ])
+    else:  
+        preprocessor = Pipeline([
+            ('normalizer', MinMaxScaler())
+        ])
 
-    test_score = model.score(X_test, Y_test)
+    # Print the steps being applied in the preprocessor pipeline
+    print(f"Preprocessor steps for {system_type}: {[step[0] for step in preprocessor.steps]}")
+
+    preprocessor.fit(X_train)
+
+    # Transform the datasets using the preprocessor
+    X_train_transformed = preprocessor.transform(X_train)
+    X_val_transformed = preprocessor.transform(X_val)
+    X_test_transformed = preprocessor.transform(X_test)
+
+    def evaluate_params(params, iteration):
+        print(f"Iteration {iteration + 1}/{n_iter_search}")
+        model = XGBClassifier(**xgboost, random_state=seed, **params)
+        model.fit(X_train_transformed, Y_train,
+                  eval_set=[(X_val_transformed, Y_val)], 
+                  early_stopping_rounds=10,
+                  verbose=False)
+        y_val_pred = model.predict(X_val_transformed)
+        return accuracy_score(Y_val, y_val_pred)
+
+    # Perform the random search
+    best_score = 0
+    best_params = None
+
+    for iteration, params in enumerate(param_list):
+        score = evaluate_params(params, iteration)
+        if score > best_score:
+            best_score = score
+            best_params = params
+
+    print("Best parameters found: ", best_params)
+    print("Best validation accuracy: ", best_score)
+
+    ### Hyperparameter Tuning with Transformed Data ###
+    best_model = XGBClassifier(**xgboost, random_state=seed, **best_params)
+    best_model.fit(np.concatenate((X_train_transformed, X_val_transformed)), 
+                   np.concatenate((Y_train, Y_val)))
+    
+    signal = best_model.predict(X_test_transformed)
+
+    test_score = accuracy_score(Y_test, signal)
     print(f'System={system_type}, ticker={ticker}, test_score={test_score}')
-
-    signal = model.predict(X_test)
 
     signal_df = pd.DataFrame({signal_label: signal}, index=X_test.index)
     return signal_df
@@ -146,12 +212,13 @@ def _generate_test_signal(
 def perform_modelling(
     tickers,
     tickers_train_path,
+    tickers_val_path,
     tickers_test_path,
     target_feature_path,
     signal_path,
     pca_settings,
     dwt_params,
-    xgboost_settings,
+    xgboost,
     seed,
 ):
     for ticker in tickers:
@@ -164,12 +231,26 @@ def perform_modelling(
             f'{target_feature_path}/{ticker}.csv', index_col=date_index_label
         ).loc[train_df.index]
 
+        val_df = pd.read_csv(
+            f'{tickers_val_path}/{ticker}.csv', index_col=date_index_label
+        )
+        
+        val_feat_df = pd.read_csv(
+            f'{target_feature_path}/{ticker}.csv', index_col=date_index_label
+        ).loc[val_df.index]
+
         test_df = pd.read_csv(
             f'{tickers_test_path}/{ticker}.csv', index_col=date_index_label
         )
+        
         test_feat_df = pd.read_csv(
             f'{target_feature_path}/{ticker}.csv', index_col=date_index_label
         ).loc[test_df.index]
+
+        common_features = train_feat_df.columns.intersection(val_feat_df.columns).intersection(test_feat_df.columns)
+        train_feat_df = train_feat_df[common_features]
+        val_feat_df = val_feat_df[common_features]
+        test_feat_df = test_feat_df[common_features]
 
         for system_type in system_types:
             signal_df = _generate_test_signal(
@@ -177,11 +258,13 @@ def perform_modelling(
                 system_type,
                 train_df,
                 train_feat_df,
+                val_df,
+                val_feat_df,
                 test_df,
                 test_feat_df,
                 pca_settings,
                 dwt_params,
-                xgboost_settings,
+                xgboost,
                 seed,
             )
 
@@ -195,23 +278,25 @@ def main():
 
     tickers_train_path = config['data']['train_path']
     tickers_test_path = config['data']['test_path']
+    tickers_val_path = config['data']['validation_path']
     target_feature_path = config['data']['target_var_path']
     tickers = config['tickers']
     signal_path = config['data']['signal_path']
     pca_settings = config['modelling']['pca']
     dwt_params = config['modelling']['dwt']
-    xgboost_settings = config['modelling']['xgboost']
+    xgboost = config['modelling']['xgboost']
     seed = config['seed']
 
     perform_modelling(
         tickers,
         tickers_train_path,
+        tickers_val_path,
         tickers_test_path,
         target_feature_path,
         signal_path,
         pca_settings,
         dwt_params,
-        xgboost_settings,
+        xgboost,
         seed,
     )
 
