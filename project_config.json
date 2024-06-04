@@ -28,7 +28,7 @@
             "gap": 100
         },
         "pca": {
-            "n_components": 6
+            "n_components": 0.95
         },
         "dwt": {
             "wavelet": "haar",
