@@ -1,8 +1,9 @@
 from datetime import datetime
 import json
-from data import tickers_loader, target_feature
-from features import technical_analysis
-from models import train_test_split
+import tickers_loader
+import technical_analysis
+import train_test_split
+import target_feature
 
 
 def main():

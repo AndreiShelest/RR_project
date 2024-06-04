@@ -11,9 +11,14 @@ Authors: João Nobre, Rui Ferreira Neves
 Main parts include
   1. PCA
   2. Discrete Wavelet Transform
-  3. XGBoost with hyperparameter tunning using MOOGA.
-  4. Applying generated signals in trading
-  5. Evaluation
+  3. XGBoost with hyperparameter tunning using MOOGA - one scenario only with PCA and DWT.
+  4. XGBoost with randomised hyperparameter search for all 3 scenarios.
+  5. Applying generated signals in trading
+  6. Evaluation
+
+# Variations from the original paper
+
+Due to long runtime training our models with MOOGA, we have reduced scope of the optimsation (for more details check out ```./project_config.json```) and decided to only train it for one scenario - with PCA and DWT. Instead of MOOGA we have decided to run all scenarios with randomised search for hyperparameters. 
 
 # Setting Up the Environment
 
@@ -27,13 +32,16 @@ You can restore the conda environment from the *environment.yml* file included i
 
 There are several essential scripts to be run in order to download and prepare the data for the modelling. In order to facilitate the process, the first four steps can be performed one by one with ```./src/data_generation.py``` script.
 
-- Firstly, execute ```./src/data/tickers_loader.py``` module to download ticker data from Yahoo Finance.
-- Next, generate target feature (Buy or Sell) by executing ```./src/data/target_feature.py```.
-- Then execute ```./src/features/technical_analysis.py``` in order to generate technical indicators.
-- After that, execute ```./src/models/train_test_split.py``` so that the appropriate split into train, validation and test datasets is created.
-- The actual modelling is performed in ```./src/modelling.py```.
+- Firstly, execute ```./src/tickers_loader.py``` module to download ticker data from Yahoo Finance.
+- Next, generate target feature (Buy or Sell) by executing ```./src/target_feature.py```.
+- Then execute ```./src/technical_analysis.py``` in order to generate technical indicators.
+- After that, execute ```./src/train_test_split.py``` so that the appropriate split into train, validation and test datasets is created.
+- The modelling with randomised hyperparameter search is performed in ```./src/modelling.py```.
+- The modelling with MOOGA is performed in ```./src/modelling_opt.py```
 - Strategies are executed by ```./src/strategy_execution.py```.
 - And, finally, in the notebook ```1.0-strategy_performance.ipynb``` you can plot the performance of strategies.
+
+There is also a clean up function that resets all the data in ```./src/clean_up.py```
 
 For each step configuration please refer to ```./project_config.json``` file, where you can see the paths where generated files are downloaded or stored, as well as configuration of algorithms.
 
